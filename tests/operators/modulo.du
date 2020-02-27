@@ -1,0 +1,10 @@
+/**
+* modulo.du
+*
+* Testing modulo
+*/
+
+var x = 10;
+
+assert(x % 2 == 0);
+assert(x % 3 == 1);

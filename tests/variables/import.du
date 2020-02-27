@@ -1,0 +1,9 @@
+/**
+* import.du
+*
+* General import file for all the variable tests
+*/
+
+import "tests/variables/scope.du";
+import "tests/variables/assignment.du";
+import "tests/variables/magic.du";

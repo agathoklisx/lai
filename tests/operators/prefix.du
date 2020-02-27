@@ -1,0 +1,10 @@
+/**
+* prefix.du
+*
+* Testing prefix operators
+*/
+
+var x = 10;
+
+assert(++x == 11);
+assert(--x == 10);

@@ -1,0 +1,38 @@
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+    <meta name="theme-color" content="#2196F3">
+    <meta property="og:title" content="Dictu" />
+    <meta property="og:description" content="Dictu is a very small, and simple dynamically typed programming language">
+
+    <title>{{ page.title }} - {{ site.title }}</title>
+    <link rel="stylesheet" href="{{ "/assets/css/just-the-docs.css" | absolute_url }}">
+
+    <script>
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            const cssFile = document.querySelector('[rel="stylesheet"]');
+            const originalCssRef = cssFile.getAttribute('href');
+            const darkModeCssRef = originalCssRef.replace('just-the-docs.css', 'dark-mode-preview.css');
+            cssFile.setAttribute('href', darkModeCssRef);
+        }
+    </script>
+
+    {% if site.ga_tracking != nil %}
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ site.ga_tracking }}"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', '{{ site.ga_tracking }}');
+    </script>
+    {% endif %}
+
+    {% if site.search_enabled != nil %}
+    <script type="text/javascript" src="{{ "/assets/js/vendor/lunr.min.js" | absolute_url }}"></script>
+    {% endif %}
+    <script type="text/javascript" src="{{ "/assets/js/just-the-docs.js" | absolute_url }}"></script>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
