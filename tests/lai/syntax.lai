@@ -22,7 +22,7 @@ class Person beg
 
 /* instance and 'var' */
 var pers = Person ("eva", 14);
-/* (expression) into expressions */
+/* (expression) into expressions and StringType methods */
 assert ("EVA" == ((pers.name.upper()).lower ()).upper ());
 assert (14 == pers.get_age ());
 
@@ -54,7 +54,8 @@ orelse
   print ("never reached here");
 /* but the whole expression is missing an 'end'. This is ambiguity, and so avoided */
 
-for (var i = 0; i < 16; ++i) beg
+/* 'for', 'do', 'orelse if' */
+for (var i = 0; i < 16; ++i) do
   if (i % 3 == 0 and i % 5 == 0) then
     assert (i == 0 or i == 15);
   orelse if (i % 3 == 0) then
@@ -64,6 +65,12 @@ for (var i = 0; i < 16; ++i) beg
     /* this 'if' use however is nice and sane, though parsers might be confused */
   end
 end
+
+/* function declaration */
+def fun () beg
+  return true;
+end
+assert (fun () == true);
 
 var cur_cwd = System.getCWD();
 
@@ -87,9 +94,9 @@ assert (System.getCWD () == cur_cwd);
 var __ = Test ("ok");
 assert (__.get () == "ok");
 
-/* buggy forever loop, as there is no break, so as the last statement is
-   finishing the test for now */
+/* buggy forever loop, as there is no break, and as the last statement,
+   is finishing the test for now */
 var ii = 0;
-forever beg
+forever do
   if (++ii > 3) then os.exit (0); end
 end

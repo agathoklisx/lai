@@ -76,6 +76,8 @@ This is same as Dictu with the following enhancements:
      (this syntax though not quite strict, it should obey these rules, if for no
       other reason (though there are reasons), then just for clarity and consistency)
 
+   - 'do' as Lua starts a loop
+
    - 'forever' is same as 'while (1)', and at the time of writing it really means
       forever, because 'break' hasn't been implemented yet, so there is no way to
       escape
