@@ -83,6 +83,7 @@ static Value exitNative(int argCount, Value *args) {
     }
 
     exit(AS_NUMBER(args[0]));
+    return EMPTY_VAL; /* satisfy tcc compiler */
 }
 
 void createSystemClass() {

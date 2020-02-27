@@ -94,6 +94,7 @@ Usage:
   # make and check the futures
   make && ./lai tests/lai/syntax.lai
 ```
+This builds without warnings with gcc-9.1.0, clang-9.0.0 and tcc last development.
 
 LICENSE:  
 This is same as Dictu, that is MIT.
