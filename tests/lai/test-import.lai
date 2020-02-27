@@ -1,0 +1,4 @@
+class Test beg
+   init (val) beg this.val = val; end
+   get () beg return this.val; end
+end

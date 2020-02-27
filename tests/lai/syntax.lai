@@ -1,0 +1,95 @@
+var this_name = "syntax.lai";
+var os = System;
+
+/* 'trait', 'beg' and 'end' */
+trait GetAgeTrait beg
+  get_age () beg
+    return this.age;
+  end
+end
+
+/* 'class', 'beg', '{' and a mix with 'end' and '}' */
+class Person beg
+  /* 'use' */
+  use GetAgeTrait;
+
+  /* init and this */
+  init (name, age) {
+    this.age = age;
+    this.name = name;
+  end
+}
+
+/* instance and 'var' */
+var pers = Person ("eva", 14);
+/* (expression) into expressions */
+assert ("EVA" == ((pers.name.upper()).lower ()).upper ());
+assert (14 == pers.get_age ());
+
+/* 'false' */
+var test = false;
+/* 'if', 'then', 'not', '!', 'or', 'orelse', and os variable as System */
+if (not test or !test) then
+  print ("ok");
+orelse then
+  print ("not ok");
+  Os.exit (1);
+end
+
+/* or !test) then */
+test = 1;
+
+/* 'is', 'and', '==', '!=', 'isnot' */
+if (test is 1 and test == 1 and test != 2 and test isnot 2) then
+  print ("ok");
+orelse then
+  print ("not ok");
+  Os.exit (1);
+end
+
+/* this use of 'orelse' is fine */
+if (true) then
+  print ("ok");
+orelse
+  print ("never reached here");
+/* but the whole expression is missing an 'end'. This is ambiguity, and so avoided */
+
+for (var i = 0; i < 16; ++i) beg
+  if (i % 3 == 0 and i % 5 == 0) then
+    assert (i == 0 or i == 15);
+  orelse if (i % 3 == 0) then
+    assert (i == 3 or i == 6 or i == 9 or i == 12);
+  orelse then
+    if (i % 2) print ("ok");
+    /* this 'if' use however is nice and sane, though parsers might be confused */
+  end
+end
+
+var cur_cwd = System.getCWD();
+
+/* argv[0] keeps this name */
+var this_path = argv[0].split("/");
+var myname = this_path.pop(); /* remove basename */
+
+assert (myname == this_name);
+
+/* change type from ListType to StringType */
+this_path = this_path.join("/");
+
+assert (System.setCWD (this_path) == 0);
+assert (System.getCWD () == cur_cwd + "/" + this_path);
+
+import "test-import.lai";
+
+assert (System.setCWD (cur_cwd) == 0);
+assert (System.getCWD () == cur_cwd);
+
+var __ = Test ("ok");
+assert (__.get () == "ok");
+
+/* buggy forever loop, as there is no break, so as the last statement is
+   finishing the test for now */
+var ii = 0;
+forever beg
+  if (++ii > 3) then os.exit (0); end
+end
