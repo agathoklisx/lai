@@ -1,5 +1,6 @@
 ```C
-/*                Introduction
+/*
+INTRODUCTION:
 This is a fork of Dictu Programming Language, which is an implementation in C of
 the Lox Programming Language.
 
@@ -51,5 +52,40 @@ here is that, the load mechanism should mean and an instance of a class.
 It is also the intention to enhance or provide new native or optional classes, though
 the intented target is for UNIX like systems, that mostly means Linux but also BSD's.
 
-License is same as Dictu, that is MIT.
+SYNTAX:
+This is same as Dictu with the following enhancements:
+
+   - 'not' is same as '!'
+
+   - 'is' and 'isnot' are same as '==' and '!=' respectively
+
+   - 'beg' and 'end' are same as '{' and '}' respectively
+
+   - add the 'then' and 'orelse' keywords so that an if statement can be written as:
+
+      if (not val) then
+          statement ();
+          ...
+      orelse if (expression) then
+          statement ();
+          ...
+      orelse then
+          statement ();
+          ...
+      end
+
+   - 'forever' is same as 'while (1)', and at the time of writing it really means
+      forever, because 'break' hasn't been implemented yet, so there is no way to
+      escape
+
+The implementation is a bit of hack, but anyway this code is not focusing at the code
+achievements, but to give the chance to the human being for code expressivity.
+
+But because it does it, by modifying the evaluation string at the lexical anallysis
+step (it modifies scanner.c), the code is rather fragile and should make assumptions.
+So for this reason, the syntax should be strict and obey a way. Otherwise, yes, it is
+an undefined behavior!
+
+LICENSE:
+This is same as Dictu, that is MIT.
 */

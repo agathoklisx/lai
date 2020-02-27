@@ -137,7 +137,15 @@ static TokenType identifierType() {
         case 'a':
             return checkKeyword(1, 2, "nd", TOKEN_AND);
         case 'b':
-            return checkKeyword(1, 4, "reak", TOKEN_BREAK);
+            if (scanner.current - scanner.start > 1) {
+                switch (scanner.start[1]) {
+                    case 'e':
+                        return checkKeyword(2, 1, "g", TOKEN_LEFT_BRACE);
+                    case 'r':
+                        return checkKeyword(2, 3, "eak", TOKEN_BREAK);
+                 }
+             }
+             break;
         case 'c':
             if (scanner.current - scanner.start > 1) {
                 switch (scanner.start[1]) {
@@ -151,14 +159,34 @@ static TokenType identifierType() {
         case 'd':
             return checkKeyword(1, 2, "ef", TOKEN_DEF);
         case 'e':
-            return checkKeyword(1, 3, "lse", TOKEN_ELSE);
+            if (scanner.current - scanner.start > 1) {
+                switch (scanner.start[1]) {
+                    case 'n':
+                        return checkKeyword(2, 1, "d", TOKEN_RIGHT_BRACE);
+                    case 'l':
+                        return checkKeyword(2, 2, "se", TOKEN_ELSE);
+                }
+            }
+            break;
         case 'f':
             if (scanner.current - scanner.start > 1) {
                 switch (scanner.start[1]) {
                     case 'a':
                         return checkKeyword(2, 3, "lse", TOKEN_FALSE);
                     case 'o':
-                        return checkKeyword(2, 1, "r", TOKEN_FOR);
+                        if (scanner.current - scanner.start == 3)
+                            return checkKeyword(2, 1, "r", TOKEN_FOR);
+
+                        if (TOKEN_IDENTIFIER == checkKeyword(2, 5, "rever", 0))
+                            return TOKEN_IDENTIFIER;
+
+                        char *modified = (char *) scanner.start;
+                        char replaced[] = "while (1) {";
+                        for (int i = 0; i < 11; i++)
+                            modified[i] = replaced[i];
+                        scanner.start   = (const char *) modified;
+                        scanner.current = scanner.start + 5;
+                        return TOKEN_WHILE;
                 }
             }
             break;
@@ -169,13 +197,41 @@ static TokenType identifierType() {
                         return checkKeyword(2, 0, "", TOKEN_IF);
                     case 'm':
                         return checkKeyword(2, 4, "port", TOKEN_IMPORT);
-                }
+                    case 's':
+                      if (scanner.current - (scanner.start + 1) > 1)
+                          return checkKeyword(2, 3, "not", TOKEN_BANG_EQUAL);
+                      return checkKeyword(1, 1, "s", TOKEN_EQUAL_EQUAL);
+                 }
             }
             break;
         case 'n':
-            return checkKeyword(1, 2, "il", TOKEN_NIL);
+            if (scanner.current - scanner.start > 1) {
+                switch (scanner.start[1]) {
+                    case 'o':
+                        return checkKeyword(2, 1, "t", TOKEN_BANG);
+                    case 'i':
+                        return checkKeyword(2, 1, "l", TOKEN_NIL);
+                }
+            }
+            break;
         case 'o':
-            return checkKeyword(1, 1, "r", TOKEN_OR);
+            if (scanner.current - scanner.start > 1) {
+                switch (scanner.start[1]) {
+                    case 'r':
+                        if (scanner.current - (scanner.start + 1) > 1) {
+                            if (TOKEN_ELSE != checkKeyword(2, 4, "else", TOKEN_ELSE))
+                                return TOKEN_IDENTIFIER;
+
+                            char *modified = (char *) scanner.start;
+                            modified[0] = '}'; modified[1] = ' ';
+                            scanner.start   = (const char *) modified;
+                            scanner.current = scanner.start + 1;
+                            return TOKEN_RIGHT_BRACE;
+                        }
+                    return checkKeyword(1, 1, "r", TOKEN_OR);
+                }
+             }
+             break;
         case 'r':
             return checkKeyword(1, 5, "eturn", TOKEN_RETURN);
         case 's':
@@ -192,7 +248,15 @@ static TokenType identifierType() {
             if (scanner.current - scanner.start > 1) {
                 switch (scanner.start[1]) {
                     case 'h':
-                        return checkKeyword(2, 2, "is", TOKEN_THIS);
+                  	  if (scanner.current - scanner.start > 1) {
+                            switch (scanner.start[2]) {
+                                case 'e':
+                                    return checkKeyword(3, 1, "n", TOKEN_LEFT_BRACE);
+                                case 'i':
+                                    return checkKeyword(3, 1, "s", TOKEN_THIS);
+                            }
+                        }
+                        break;
                     case 'r':
                         if (scanner.current - scanner.start > 1) {
                             switch (scanner.start[2]) {
@@ -202,6 +266,7 @@ static TokenType identifierType() {
                                     return checkKeyword(3, 2, "it", TOKEN_TRAIT);
                             }
                         }
+                    break;
                 }
             }
             break;
