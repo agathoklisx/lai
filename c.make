@@ -18,6 +18,13 @@ else
 	BUILD_DIR := build/release
 endif
 
+DISASSEMBLE := 0
+DISASSEMBLE_FP := stderr
+
+ifneq ($(DISASSEMBLE), 0)
+    CFLAGS += -DDEBUG_PRINT_CODE -DDISASSEMBLE_FP=$(DISASSEMBLE_FP)
+endif
+
 # Files.
 HEADERS := $(wildcard $(SOURCE_DIR)/*.h) $(wildcard $(SOURCE_DIR)/datatypes/*.h) $(wildcard $(SOURCE_DIR)/optionals/*.h)
 SOURCES := $(wildcard $(SOURCE_DIR)/*.c) $(wildcard $(SOURCE_DIR)/datatypes/*.c) $(wildcard $(SOURCE_DIR)/optionals/*.c)

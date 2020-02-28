@@ -288,9 +288,8 @@ static ObjFunction *endCompiler() {
     ObjFunction *function = current->function;
 #ifdef DEBUG_PRINT_CODE
     if (!parser.hadError) {
-
-      disassembleChunk(currentChunk(),
-          function->name != NULL ? function->name->chars : "<top>");
+        disassembleChunk(currentChunk(),
+            function->name != NULL ? function->name->chars : "<top>");
     }
 #endif
 
