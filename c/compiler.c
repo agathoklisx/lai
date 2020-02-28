@@ -1549,9 +1549,16 @@ static void returnStatement() {
 }
 
 static void importStatement() {
-    consume(TOKEN_STRING, "Expect string after import.");
-    emitConstant(OBJ_VAL(copyString(parser.previous.start + 1,
-                                    parser.previous.length - 2)));
+    if (check(TOKEN_LEFT_PAREN)) {
+        consume(TOKEN_LEFT_PAREN, "Expect '(' after import.");
+        expression();
+        consume(TOKEN_RIGHT_PAREN, "Expect ')' after import expression.");
+    } else {
+        consume(TOKEN_STRING, "Expect string after import.");
+        emitConstant(OBJ_VAL(copyString(parser.previous.start + 1,
+                                        parser.previous.length - 2)));
+    }
+
     consume(TOKEN_SEMICOLON, "Expect ';' after import.");
 
     emitByte(OP_IMPORT);
