@@ -60,6 +60,12 @@ void runtimeError(const char *format, ...) {
     resetStack();
 }
 
+void setcurrentFile(const char *scriptname) {
+    push(OBJ_VAL(copyString(scriptname, (int) strlen(scriptname))));
+    tableSet(&vm.globals, copyString("__FILE__", 8), OBJ_VAL(copyString (vm.currentScriptName, strlen (vm.currentScriptName))));
+    pop();
+}
+
 void initArgv(int argc, const char *argv[]) {
     ObjList *list = initList();
     push(OBJ_VAL(list));
@@ -92,6 +98,7 @@ void initVM(bool repl, const char *scriptName, int argc, const char *argv[]) {
     initTable(&vm.globals);
     initTable(&vm.strings);
     initTable(&vm.imports);
+    setcurrentFile(scriptName);
     vm.initString = copyString("init", 4);
     vm.replVar = copyString("_", 1);
     defineAllNatives();
@@ -880,6 +887,7 @@ static InterpretResult run() {
 
             char *s = readFile(fileName->chars);
             vm.currentScriptName = fileName->chars;
+            setcurrentFile(vm.currentScriptName);
 
             ObjFunction *function = compile(s);
             if (function == NULL) return INTERPRET_COMPILE_ERROR;

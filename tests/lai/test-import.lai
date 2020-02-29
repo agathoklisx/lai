@@ -1,4 +1,14 @@
-class Test beg
-   init (val) beg this.val = val; end
-   get () beg return this.val; end
+/* has to be copied because __FILE__ can change */
+var my_ns = __FILE__;
+/* and has to be a uniq variable name, and this is a weakness, as there
+ * is no way for uniq/local/static in unit variables */
+
+class TestImportA beg
+  init () beg
+    this.myns = Path.basename(my_ns);
+  end
+
+  ns () beg
+    return this.myns;
+  end
 end
