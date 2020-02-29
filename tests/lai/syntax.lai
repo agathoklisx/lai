@@ -95,9 +95,9 @@ class Path < stdlib beg
 
   dirname (name) beg
     var p = name.split(this.delim);
-    var num = len (p);
-    if (num is 1) then return p[0]; end
-    return p[:num - 1].join(this.delim);
+    var len = p.len();
+    if (len is 1) then return "."; end
+    return p[:len - 1].join(this.delim);
   end
 
   split (name) beg
@@ -137,6 +137,32 @@ assert (__.ns () == "test-import.lai");
 /* change reference */
 __ = TestImportB ();
 assert (__.ns () == "test-import-as_expression.lai");
+
+/* len() method */
+var s = set();
+s.add ("alpha");
+s.add ("vita");
+assert (s.len() == 2);
+assert ("asdfg".len() == 5);
+assert ("ασδφγ".len() == 10);
+assert ([1, 2, 3].len() == 3);
+assert ({"one": 1, "two": 2}.len() == 2);
+
+/* type() and Types */
+assert (type("as") == "string");
+assert (type(s) == "set");
+assert (type([1]) == "list");
+assert (type({"one": 1}) == "dict");
+assert (type(fun) == "function");
+assert (type(Path) == "Path");         /* This is why the above is not good practice */
+assert (type(TestImportA) == "class"); /* like in this case */
+assert (type(GetAgeTrait) == "trait");
+assert (type(print) == "native");
+assert (type(Path.basename) == "method");
+assert (type(true) == "bool");
+assert (type(1) == "number");
+assert (type(1.5) == "number");
+assert (type(nil) == "nil");
 
 /* buggy 'forever' loop, as there is np 'break', so and as the last statement,
    is finishing the test for now by calling exit */

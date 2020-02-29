@@ -433,9 +433,27 @@ static bool formatString(int argCount) {
     return true;
 }
 
+static bool lenString(int argCount) {
+    if (argCount != 1) {
+        runtimeError("len() takes 1 arguments (%d  given)", argCount);
+        return false;
+    }
+
+    if (!IS_STRING(peek(0))) {
+        runtimeError("Argument passed to len() must be a string");
+        return false;
+    }
+
+    ObjString *string = AS_STRING(pop());
+    push(NUMBER_VAL(string->length));
+    return true;
+}
+
 bool stringMethods(char *method, int argCount) {
     if (strcmp(method, "format") == 0) {
         return formatString(argCount);
+    } else if (strcmp(method, "len") == 0) {
+        return lenString(argCount);
     } else if (strcmp(method, "split") == 0) {
         return splitString(argCount);
     } else if (strcmp(method, "contains") == 0) {

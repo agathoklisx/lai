@@ -76,7 +76,7 @@ This is same as Dictu with the following enhancements:
      (this syntax though not quite strict, it should obey these rules, if for no
       other reason (though there are reasons), then just for clarity and consistency)
 
-   - 'do' as Lua starts a loop
+   - 'do' as Lua starts a loop body
 
    - 'forever' is same as 'while (1)', and at the time of writing it really means
       forever, because 'break' hasn't been implemented yet, so there is no way to
@@ -89,6 +89,15 @@ But because it does it, by modifying the evaluation string at the lexical anally
 step (it modifies scanner.c), the code is rather fragile and should make assumptions.
 So for this reason, the syntax should be strict and obey a way. Otherwise, yes, it is
 an undefined behavior!
+
+Also as extensions to Dictu (see docs/docs/* for Dictu semantics):
+
+  - __FILE__ refers to the path of the compilation unit. It has to be stored in a top
+    variable with a unique name
+
+  - len() method String|List|Dict|Set Types (Dictu exposes len() as native)
+
+  - import can accept also expressions (Dictu 'import' accepts only strings)
 */
 ```
 Usage:
@@ -98,5 +107,6 @@ Usage:
 ```
 This builds without warnings with gcc-9.1.0, clang-9.0.0 and tcc last development.
 
+The above test script should include the whole syntax.
 LICENSE:  
 This is same as Dictu, that is MIT.

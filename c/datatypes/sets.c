@@ -80,9 +80,23 @@ static bool containsSetItem(int argCount) {
     return true;
 }
 
+static bool lenSet(int argCount) {
+    if (argCount != 1) {
+        runtimeError("len() takes 1 arguments (%d given)", argCount);
+        return false;
+    }
+
+    ObjSet *set = AS_SET(pop());
+    push(NUMBER_VAL(set->count));
+
+    return true;
+}
+
 bool setMethods(char *method, int argCount) {
     if (strcmp(method, "add") == 0) {
         return addSetItem(argCount);
+    } else if (strcmp(method, "len") == 0) {
+        return lenSet(argCount);
     } else if (strcmp(method, "remove") == 0) {
         return removeSetItem(argCount);
     } else if (strcmp(method, "contains") == 0) {

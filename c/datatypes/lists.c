@@ -226,9 +226,22 @@ static bool copyListDeep(int argCount) {
     return true;
 }
 
+bool lenList(int argCount) {
+    if (argCount != 1) {
+        runtimeError("len() takes 1 argument (%d  given)", argCount);
+        return false;
+    }
+
+    ObjList *list = AS_LIST(pop());
+    push(NUMBER_VAL(list->values.count));
+    return true;
+}
+
 bool listMethods(char *method, int argCount) {
     if (strcmp(method, "push") == 0) {
         return pushListItem(argCount);
+    } else if (strcmp(method, "len") == 0) {
+        return lenList(argCount);
     } else if (strcmp(method, "insert") == 0) {
         return insertListItem(argCount);
     } else if (strcmp(method, "pop") == 0) {

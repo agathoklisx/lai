@@ -121,9 +121,22 @@ static bool copyDictDeep(int argCount) {
     return true;
 }
 
+static bool lenDict(int argCount) {
+    if (argCount != 1) {
+        runtimeError("len() takes 1 argument (%d  given)", argCount);
+        return false;
+    }
+
+    ObjDict *dict = AS_DICT(pop());
+    push(NUMBER_VAL(dict->count));
+    return true;
+}
+
 bool dictMethods(char *method, int argCount) {
     if (strcmp(method, "get") == 0) {
         return getDictItem(argCount);
+    } else if (strcmp(method, "len") == 0) {
+        return lenDict(argCount);
     } else if (strcmp(method, "remove") == 0) {
         return removeDictItem(argCount);
     } else if (strcmp(method, "exists") == 0) {
