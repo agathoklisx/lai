@@ -130,6 +130,7 @@ The above test script should include the whole syntax of this dialect.
 But here is some funny and valid code, and with a personal conclusion at the end.
   note: why anyone want to do that? but is possible
 */
+```
 ```ruby
 class int beg
   init (nr) beg
@@ -154,7 +155,7 @@ var n = int (10);
 assert (n.plus(10).plus(10).__() == 30);
 assert (n.plus(10).to_s() == "40");
 ```
-
+```C
 /* okey, this is an extreme but those things happens actually under the hood in
    a programming language that abstract details to offer convienences, so there
    is a price. For a scripting language which is being used as a driver this can
@@ -227,3 +228,4 @@ Anyway the Dictu LICENSE is attached to this project.
 
 Again thanks for this journey, I feel that owe a lot.
 */
+```

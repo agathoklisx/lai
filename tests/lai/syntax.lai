@@ -164,6 +164,29 @@ assert (type(1) == "number");
 assert (type(1.5) == "number");
 assert (type(nil) == "nil");
 
+/* add the http tests from upstream. We have to do it manually since inside
+ * the if block 'import' doesn't work.
+ *
+ * But the code below doesn't completes. The first error message was "Too many
+ * constants" that comes from makeConstant() into compiler.c. Probably because
+ * of uint8_t is being small. And too many functions down the chain assume uint8_t.
+ * If i split the file and load the code with 'import' everything is working
+ */
+
+if (argv.len() > 1 and argv[1] == "--enable-http") beg
+  var response = HTTP.get("https://httpbin.org/get");
+
+  assert(response["statusCode"] == 200);
+  assert(response["content"].contains("headers"));
+  assert(response["headers"].len() > 0);
+  var response = HTTP.post("https://httpbin.org/post", {"test": 10});
+
+  assert(response["statusCode"] == 200);
+  assert(response["headers"].len() > 0);
+  assert(response["content"].contains("origin"));
+  assert(response["content"].contains('"test": "10"'));
+end
+
 /* buggy 'forever' loop, as there is np 'break', so and as the last statement,
    is finishing the test for now by calling exit */
 var ii = 0;
