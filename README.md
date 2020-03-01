@@ -107,6 +107,13 @@ Also as extensions to Dictu (see docs/docs/* for Dictu semantics):
     has to be implemented, mainly the type(), to_s()  and to_i() methods
 
   - import can accept also expressions (Dictu 'import' accepts only strings)
+
+Build time deferences:
+
+  - make DISABLE_HTTP=1 avoids to link against libcurl, which Dictu build system does
+    it by default as a dependency to the HTTP class. In that case to disable also the
+    http tests, use "--disable-http" when running the tests.
+
 */
 ```
 Usage:
