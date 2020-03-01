@@ -7,7 +7,7 @@
 
 CFLAGS := -g -Wall -Wextra -Werror -Wno-unused-parameter -fno-strict-aliasing \
           -Wshadow -Wunused-function -Wunused-macros -fno-strict-aliasing
-LFLAGS := -lm
+LFLAGS := -lm -lcurl
 
 # Mode configuration.
 ifeq ($(MODE),debug)
