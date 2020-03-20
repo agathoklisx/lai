@@ -114,6 +114,8 @@ Build time deferences:
     it by default as a dependency to the HTTP class. In that case to disable also the
     http tests, use "--disable-http" when running the tests.
 
+    Note: this is merged upstream.
+
 */
 ```
 Usage:

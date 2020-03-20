@@ -61,7 +61,7 @@ static bool replCountQuotes(char *line) {
     return singleQuotes % 2 == 0 && doubleQuotes % 2 == 0;
 }
 
-static void repl(int argc, const char *argv[]) {
+static void repl(VM *vm, int argc, const char *argv[]) {
     printf(VERSION);
     char *line;
 
@@ -96,34 +96,69 @@ static void repl(int argc, const char *argv[]) {
             linenoiseHistorySave("history.txt");
         }
 
-        interpret(fullLine);
+        interpret(vm, fullLine);
 
         free(line);
         free(fullLine);
     }
 }
 
-static void runFile(int argc, const char *argv[]) {
+static void runFile(VM *vm, int argc, const char *argv[]) {
     char *source = readFile(argv[1]);
-    InterpretResult result = interpret(source);
+    InterpretResult result = interpret(vm, source);
     free(source); // [owner]
 
     if (result == INTERPRET_COMPILE_ERROR) exit(65);
     if (result == INTERPRET_RUNTIME_ERROR) exit(70);
 }
 
+#define EvalString(...) #__VA_ARGS__
+char *__STDLIB__ = EvalString (
+trait basename beg
+   basename (name, delim) beg
+     return name.split(delim).pop();
+   end
+end
+
+class stdlib beg
+  use basename;
+end
+
+class Path < stdlib beg
+  init () beg
+    this.delim = '/';
+  end
+
+  basename (name) beg
+    return super.basename (name, this.delim);
+  end
+
+  dirname (name) beg
+    var p = name.split(this.delim);
+    var len = p.len();
+    if (len is 1) then return "."; end
+    return p[:len - 1].join(this.delim);
+  end
+
+  split (name) beg
+    return name.split(this.delim);
+  end
+end
+);
+
 int main(int argc, const char *argv[]) {
-    initVM(argc == 1, argc >= 2 ? argv[1] : "repl", argc, argv);
+    VM *vm = initVM(argc == 1, argc >= 2 ? argv[1] : "repl", argc, argv);
+    interpret (vm, __STDLIB__);
 
     if (argc == 1) {
-        repl(argc, argv);
+        repl(vm, argc, argv);
     } else if (argc >= 2) {
-        runFile(argc, argv);
+        runFile(vm, argc, argv);
     } else {
         fprintf(stderr, "Usage: dictu [path] [args]\n");
         exit(64);
     }
 
-    freeVM();
+    freeVM(vm);
     return 0;
 }
