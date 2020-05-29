@@ -115,11 +115,11 @@ Build time deferences:
 
 /* Update (end of May of 2020):
 
-   Since almost all of the development were merged upstream, plus there is an extremely
+   Since almost all of the development wes merged upstream, plus there is an extremely
    nice collaboration, there was no really need to continue with the fork in a lonely
    trip.
 
-   Also, because there was the will to execute Dictu scripts without any modification
+   Also, because there is the will to execute Dictu scripts without any modification
    I had always to catch up with Dictu development.
 
    So this ended up as a more general tool with some broader functionality, and which
@@ -127,7 +127,7 @@ Build time deferences:
    is very convenient when you are working with C.
 
    This tool works by parsing the unmodified Dictu sources and generates the required
-   files.
+   files, that can be compiled as a library.
 
    It can also parses a lai script and tranlate it as a Dictu script.
 */

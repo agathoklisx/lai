@@ -1121,19 +1121,6 @@ int parse_lai (char *laiscript, size_t scr_len) {
       tmp_len = str_cp (lline, lline_len, line, nread);
       tmp_len = str_cp (tmp, lline_len, lline, tmp_len);
 
-      while ((match = strstr (tmp + diff, "(not "))) {
-        ldiff = match - tmp;
-        str_cp (lline + diff, lline_len, tmp, ldiff);
-        diff = ldiff + 5;
-        lline[ldiff] = '(';
-        lline[++ldiff] = '!';
-        lline[++ldiff] = '\0';
-      }
-
-      tmp_len = str_cp (lline + ldiff, lline_len, line + diff, tmp_len - diff);
-      tmp_len = str_cp (tmp, lline_len, lline, tmp_len + ldiff);
-
-      diff = ldiff = 0;
       while ((match = strstr (tmp + diff, " is "))) {
         ldiff = match - tmp;
         str_cp (lline + diff, lline_len, tmp, ldiff);
