@@ -1,0 +1,40 @@
+/* lai specific tests */
+
+assert (not true == false);
+
+assert (not false is true);
+
+assert (not true isnot true);
+
+beg
+  assert (true is true);
+end
+
+if (true is false) then
+  assert (true is false);
+end
+
+if (false is true) then
+  assert ("then" is "");
+orelse then
+  print ("ok");
+end
+
+if (false is true) then
+  assert (false is true);
+orelse if (1 is 0) then
+  assert (1 is 0);
+orelse then
+  print ("ok");
+end
+
+for (var i = 0; i < 1; ++i) do
+  print ("ok");
+end
+
+forever do
+  print ("ok");
+  break;
+end
+
+forever do break; end
