@@ -154,6 +154,15 @@ char main_headers[] =
 #define IS_DIR_SEP(c)     (c == DIR_SEP)
 #define ISNOT_DIR_SEP(c)  (c != DIR_SEP)
 
+#define PARSELINE_OK         2
+#define PARSELINE_NEXT_LINE  1
+#define PARSELINE_NEXT_FILE  0
+#define PARSELINE_BREAK     -1
+
+#define PARSEFILE_OK         1
+#define PARSEFILE_NEXT       0
+#define PARSEFILE_BREAK     -1
+
 typedef struct lang_t lang_t;
 
 typedef int(*File_cb) (lang_t *, char *);
@@ -172,6 +181,7 @@ typedef struct lang_t {
      ext[4];
 
   int
+    file_idx,
     arg_idx,
     exttype,
     enable_lai,
@@ -204,7 +214,8 @@ typedef struct lang_t {
     lai_api_len,
     lai_ext_len,
     base_dir_len,
-    sys_dir_len;
+    sys_dir_len,
+    line_len;
 
   Line_cb line_cb;
   File_cb file_cb;
@@ -520,73 +531,113 @@ theend:
   return retval;
 }
 
+char *insert_str (lang_t *this, char *line, size_t len, char *ptr, char *buf, size_t buflen) {
+  if (len + buflen + 1 > this->line_len) {
+    this->line_len += buflen + 1;
+    line = Realloc (line, this->line_len);
+  }
+
+  ptrdiff_t diff = ptr - line;
+  memmove (line + diff + buflen, ptr, len - diff);
+  memcpy (line + diff, buf, buflen);
+  line[len + buflen] = '\0';
+  return line;
+}
+
 int file_cb (lang_t *this, char * file) {
   if (NULL != strstr (file, "common.c"))
-    return 0;
+    return PARSEFILE_NEXT;
 
   if (NULL != strstr (file, "optionals.c"))
-    return 0;
+    return PARSEFILE_NEXT;
 
   if (NULL != strstr (file, "http")) {
     if (this->enable_http == 0)
-      return 0;
+    return PARSEFILE_NEXT;
   }
 
-  return 1;
+  return PARSEFILE_OK;
 }
 
 int parse_compiler (lang_t *this, char *line, size_t len) {
   (void) this;
-  if (len < 5) return 2;
+  if (len < 5) return PARSELINE_OK;
+
+  char prefix[] = "comp_";
+  size_t pr_len = 5;
 
   char *tmp = strstr (line, "number(");
-  while (tmp) {
-    *tmp = 'N';
-    tmp = strstr(tmp, "number(");
+  if (tmp) {
+    line = insert_str (this, line, len, tmp, prefix, pr_len);
+    return PARSELINE_OK;
   }
+
   tmp = strstr (line, "{number,");
-  if (tmp) tmp[1] = 'N';
+  if (tmp) {
+    tmp++;
+    line = insert_str (this, line, len, tmp, prefix, pr_len);
+    return PARSELINE_OK;
+  }
 
   tmp = strstr (line, "string(");
-  if (tmp) *tmp = 'S';
+  if (tmp) {
+    line = insert_str (this, line, len, tmp, prefix, pr_len);
+    return PARSELINE_OK;
+  }
 
   tmp = strstr (line, "{string,");
-  if (tmp) tmp[1] = 'S';
+  if (tmp) {
+    tmp++;
+    line = insert_str (this, line, len, tmp, prefix, pr_len);
+    return PARSELINE_OK;
+  }
+
+  tmp = strstr (line, "function(");
+  if (tmp) {
+    line = insert_str (this, line, len, tmp, prefix, pr_len);
+    return PARSELINE_OK;
+  }
 
   tmp = strstr (line, "call(");
-  if (tmp) *tmp = 'C';
+  if (tmp) {
+    line = insert_str (this, line, len, tmp, prefix, pr_len);
+    return PARSELINE_OK;
+  }
 
   tmp = strstr (line, ", call,");
-  if (tmp) tmp[2] = 'C';
+  if (tmp) {
+    tmp += 2;
+    line = insert_str (this, line, len, tmp, prefix, pr_len);
+    return PARSELINE_OK;
+   }
 
-  return 2;
+  return PARSELINE_OK;
 }
 
 int parse_scanner (lang_t *this, char *line, size_t len) {
-  (void) len;
+  char prefix[] = "scan_";
+  size_t pr_len = 5;
+
   char *tmp = strstr (line, "peek");
   while (tmp) {
-    *tmp = 'P';
-    tmp = strstr(tmp, "peek");
+    line = insert_str (this, line, len, tmp, prefix, pr_len);
+    len += pr_len;
+    tmp = strstr(tmp + 8, "peek");
   }
 
   tmp = strstr (line, "advance");
-  while (tmp) {
-    *tmp = 'A';
-    tmp = strstr(tmp, "advance");
-  }
+  if (tmp)
+    line = insert_str (this, line, len, tmp, prefix, pr_len);
 
   tmp = strstr (line, "match");
-  while (tmp) {
-    *tmp = 'M';
-    tmp = strstr(tmp, "match");
-  }
+  if (tmp)
+    line = insert_str (this, line, len, tmp, prefix, pr_len);
 
   if (this->enable_lai) {
     if (this->skip_function) {
       if (str_eq (line, "}\n"))
         this->skip_function = 0;
-      return 1;
+      return PARSELINE_NEXT_LINE;
     }
 
     if (str_eq (line, "static TokenType identifierType() {\n")) {
@@ -596,72 +647,107 @@ int parse_scanner (lang_t *this, char *line, size_t len) {
       FILE *fp = fopen (ext, "r");
       if (fp == NULL) {
         fprintf (stderr, "fopen(): %s\n%s\n", ext, strerror (errno));
-        return -1;
+        return PARSELINE_BREAK;
       }
 
       if (-1 == fseek (fp, 0, SEEK_END)) {
         fprintf (stderr, "fseek(): %s\n", strerror (errno));
         fclose (fp);
-        return -1;
+        return PARSELINE_BREAK;
       }
 
       long bytes = ftell (fp);
       if (-1 == bytes) {
         fprintf (stderr, "ftell(): %s\n", strerror (errno));
         fclose (fp);
-        return -1;
+        return PARSELINE_BREAK;
       }
 
       if (-1 == fseek (fp, 0, SEEK_SET)) {
         fprintf (stderr, "fseek(): %s\n", strerror (errno));
         fclose (fp);
-        return -1;
+        return PARSELINE_BREAK;
       }
 
       char buf[bytes + 1];
       if ((size_t) bytes != fread (buf, 1, bytes, fp)) {
         fprintf (stderr, "fread(): couldn't read the requester bytes\n");
         fclose (fp);
-        return -1;
+        return PARSELINE_BREAK;
       }
 
       buf[bytes] = '\0';
       fprintf (this->fp_out, "%s", buf);
       this->skip_function = 1;
       fclose (fp);
-      return 1;
+      return PARSELINE_NEXT_LINE;
     }
   }
 
-  return 2;
+  return PARSELINE_OK;
 }
 
 int parse_class (lang_t *this, char *line, size_t len) {
-  (void) len; (void) this;
+  char prefix[] = "clas_";
+  size_t pr_len = 5;
 
   char *tmp = strstr (line, "toString(");
-  if (tmp) *tmp = 'T';
+  if (tmp) {
+    line = insert_str (this, line, len, tmp, prefix, pr_len);
+    return PARSELINE_OK;
+  }
 
   tmp = strstr (line, "toString)");
-  if (tmp) *tmp = 'T';
+  if (tmp)
+    line = insert_str (this, line, len, tmp, prefix, pr_len);
 
-  return 2;
+  return PARSELINE_OK;
 }
 
 int parse_env (lang_t *this, char *line, size_t len) {
-  (void) len; (void) this;
+  char prefix[] = "env_";
+  size_t pr_len = 4;
   char *tmp = strstr (line, "get(");
-  if (tmp) *tmp = 'G';
+  if (tmp) {
+    line = insert_str (this, line, len, tmp, prefix, pr_len);
+    return PARSELINE_OK;
+  }
 
   tmp = strstr (line, "get)");
-  if (tmp) *tmp = 'G';
+  if (tmp)
+    line = insert_str (this, line, len, tmp, prefix, pr_len);
 
-  return 2;
+  return PARSELINE_OK;
+}
+
+int parse_jsonBuilderLib (lang_t *this, char *line, size_t len) {
+  (void) this; (void) len;
+  char *tmp = strstr (line, "default_opts");
+  if (tmp) {
+    tmp[0] = 'D';
+    tmp[8] = 'O';
+  }
+
+  return PARSELINE_OK;
+}
+
+int parse_jsonParseLib (lang_t *this, char *line, size_t len) {
+  char *tmp = strstr (line, "uchar");
+  while (tmp) {
+    if (*(tmp-1) != '_' || *(tmp+5) != '2') {
+      line = insert_str (this, line, len, tmp, "l_", 2);
+      len += 2;
+    }
+
+    tmp = strstr (tmp + 5, "uchar");
+  }
+
+  return PARSELINE_OK;
 }
 
 int line_cb (lang_t *this, char *file, char *line, size_t len) {
   if (0 == strncmp ("#include", line, 8))
-    return 1;
+    return PARSELINE_NEXT_LINE;
 
   if (strstr (file, "compiler.c"))
     return parse_compiler (this, line, len);
@@ -675,7 +761,13 @@ int line_cb (lang_t *this, char *file, char *line, size_t len) {
   if (strstr (file, "env.c"))
     return parse_env (this, line, len);
 
-  return 2;
+  if (strstr (file, "jsonBuilderLib.c"))
+    return parse_jsonBuilderLib (this, line, len);
+
+  if (strstr (file, "jsonParseLib.c"))
+    return parse_jsonParseLib (this, line, len);
+
+  return PARSELINE_OK;
 }
 
 int file_on_close_cb (lang_t *this, char *file) {
@@ -705,10 +797,9 @@ int write_files (lang_t *this, char **files, size_t arrlen) {
          this->base_dir, files[i], this->ext[this->exttype]);
 
      int cb_retval = this->file_cb (this, file);
-     if (-1 == cb_retval) {
+     if (PARSEFILE_BREAK == cb_retval) {
        return 0;
-     }
-     else if (0 == cb_retval) {
+     } else if (PARSEFILE_NEXT == cb_retval) {
        continue;
      }
 
@@ -717,25 +808,25 @@ int write_files (lang_t *this, char **files, size_t arrlen) {
        return -1;
      }
 
-     fprintf (this->fp_out, "\n    /* %s.%c */\n", files[i], this->ext[this->exttype]);
+     fprintf (this->fp_out, "\n    /*%d: %s.%c */\n", ++this->file_idx, files[i], this->ext[this->exttype]);
 
-     size_t len = 0;
      char *line = NULL;
+     this->line_len = 0;
 
      ssize_t nread;
-     while (-1 != (nread = getline (&line, &len, this->fp_in))) {
+     while (-1 != (nread = getline (&line, &this->line_len, this->fp_in))) {
        if (nread) {
          cb_retval = this->line_cb (this, file, line, nread);
-         if (-1 == cb_retval) {
+         if (PARSELINE_BREAK == cb_retval) {
            fclose (this->fp_in);
            free (line);
            return 0;
          }
 
-         if (0 == cb_retval)
+         if (PARSELINE_NEXT_FILE == cb_retval)
            goto next;
 
-         if (1 == cb_retval)
+         if (PARSELINE_NEXT_LINE == cb_retval)
            continue;
 
          fprintf (this->fp_out, "%s", line);
@@ -1599,6 +1690,7 @@ lang_t init_this (int argc, char **argv) {
   this.lai_api_len = strlen (LAI_API);
   this.lai_ext_len = strlen (LAI_EXTRA);
   this.ext[H_TYPE] = 'h'; this.ext[C_TYPE] = 'c'; this.ext[2] = '\0';
+  this.file_idx = 0;
   this.line_cb = line_cb;
   this.file_cb = file_cb;
   this.on_close_cb = file_on_close_cb;
