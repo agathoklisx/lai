@@ -31,6 +31,8 @@
  *                        # humanized form and mimics a bit of Lua
  *                        # Note: this is Dictu compatible, so Dictu scripts should
  *                        # run without any modification, otherwise is a bug
+ *      --disable-exit    # disables exit() method from System Class
+ *                        # off by default, enabled with lai implicitly
  *      --parse-lai       # parse lai script and output a Dictu script with a .du extension
  *                        # Note: When this option is encountered, parsing argv stops
  *                        # and any subsequent argunent is treated as argument to this
@@ -55,6 +57,12 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
+
+
+#define ifnot(__expr__) if (0 == (__expr__))
+#define bytelen strlen
+
+#define uchar unsigned char
 
 char *c_files[] = {
   "common",
@@ -187,6 +195,7 @@ typedef struct lang_t {
     enable_lai,
     enable_http,
     enable_repl,
+    disable_exit,
     build_library,
     build_interp,
     donot_generate,
@@ -244,8 +253,8 @@ typedef struct lang_t {
   })
 
 int str_eq (const char *sa, const char *sb) {
-  const unsigned char *spa = (const unsigned char *) sa;
-  const unsigned char *spb = (const unsigned char *) sb;
+  const uchar *spa = (const uchar *) sa;
+  const uchar *spb = (const uchar *) sb;
   for (; *spa == *spb; spa++, spb++)
     if (*spa == 0) return 1;
 
@@ -253,11 +262,11 @@ int str_eq (const char *sa, const char *sb) {
 }
 
 int str_cmp_n (const char *sa, const char *sb, size_t n) {
-  const unsigned char *spa = (const unsigned char *) sa;
-  const unsigned char *spb = (const unsigned char *) sb;
+  const uchar *spa = (const uchar *) sa;
+  const uchar *spb = (const uchar *) sb;
   for (;n--; spa++, spb++) {
     if (*spa != *spb)
-      return (*(unsigned char *) spa - *(unsigned char *) spb);
+      return (*(uchar *) spa - *(uchar *) spb);
 
     if (*spa == 0) return 0;
   }
@@ -313,7 +322,7 @@ char **dirlist (char *dir) {
 
   struct dirent *dp;
 
-  size_t dirlen = strlen (dir);
+  size_t dirlen = bytelen (dir);
   size_t len;
 
   int num_files = 2;
@@ -327,7 +336,7 @@ char **dirlist (char *dir) {
     if (NULL == (dp = readdir (dh)))
       break;
 
-    len = strlen (dp->d_name);
+    len = bytelen (dp->d_name);
 
     if (len < 3 && dp->d_name[0] == '.')
       if (len == 1 || dp->d_name[1] == '.')
@@ -378,7 +387,7 @@ char *dir_current (void) {
 }
 
 char *path_dirname (char *name) {
-  size_t len = strlen (name);
+  size_t len = bytelen (name);
   char *dname = NULL;
   if (name == NULL || 0 == len) {
     dname = Alloc (2); dname[0] = '.'; dname[1] = '\0';
@@ -432,7 +441,7 @@ char *path_basename (char *name) {
     return name;
 
   char *p = nullbyte_in_str (name);
-  if (p == NULL) p = name + strlen (name) + 1;
+  if (p == NULL) p = name + bytelen (name) + 1;
   if (p - 1 == name && IS_DIR_SEP (*(p - 1)))
     return p - 1;
 
@@ -448,7 +457,7 @@ char *path_extname (char *name) {
     return name;
 
   char *p = nullbyte_in_str (name);
-  if (p == NULL) p = name + strlen (name) + 1;
+  if (p == NULL) p = name + bytelen (name) + 1;
   while (p > name && (*(p - 1) != '.')) --p;
   if (p == name)
     return "";
@@ -553,7 +562,9 @@ int file_cb (lang_t *this, char * file) {
 
   if (NULL != strstr (file, "http")) {
     if (this->enable_http == 0)
-    return PARSEFILE_NEXT;
+      return PARSEFILE_NEXT;
+
+    fprintf (this->fp_out, "#ifndef DISABLE_HTTP\n\n");
   }
 
   return PARSEFILE_OK;
@@ -720,6 +731,27 @@ int parse_env (lang_t *this, char *line, size_t len) {
   return PARSELINE_OK;
 }
 
+int parse_system (lang_t *this, char *line, size_t len) {
+  char pat[] = "defineNative(vm, &klass->methods, \"exit\", exitNative);\n";
+  size_t plen = bytelen (pat);
+
+  if (len < plen)
+    return PARSELINE_OK;
+
+  ifnot (this->disable_exit)
+    return PARSELINE_OK;
+
+
+  char dis_txt[] = "/*** DISABLED ***/\n    (void) exitNative;\n    // ";
+  size_t dis_len = bytelen (dis_txt);
+
+  char *tmp = strstr (line, pat);
+  if (tmp)
+    line = insert_str (this, line, len, tmp, dis_txt, dis_len);
+
+  return PARSELINE_OK;
+}
+
 int parse_jsonBuilderLib (lang_t *this, char *line, size_t len) {
   (void) this; (void) len;
   char *tmp = strstr (line, "default_opts");
@@ -761,6 +793,9 @@ int line_cb (lang_t *this, char *file, char *line, size_t len) {
   if (strstr (file, "env.c"))
     return parse_env (this, line, len);
 
+  if (strstr (file, "system.c"))
+    return parse_system (this, line, len);
+
   if (strstr (file, "jsonBuilderLib.c"))
     return parse_jsonBuilderLib (this, line, len);
 
@@ -773,9 +808,16 @@ int line_cb (lang_t *this, char *file, char *line, size_t len) {
 int file_on_close_cb (lang_t *this, char *file) {
   if (strstr (file, "vm.c")) {
     fprintf (this->fp_out,
-        "\nTable vm_get_globals(VM *vm) {\n"
-        "    return vm->globals;\n}\n");
+        "\n/*** EXTENSIONS ***/\n\n"
+        "Table vm_get_globals(VM *vm) {\n"
+        "    return vm->globals;\n}\n\n"
+        "size_t vm_sizeof(void) {\n"
+        "    return sizeof (VM);\n}\n\n"
+        "/*** EXTENSIONS END ***/\n");
   }
+
+  if (NULL != strstr (file, "http"))
+    fprintf (this->fp_out, "\n#endif /* DISABLE_HTTP */\n");
 
   return 0;
 }
@@ -784,7 +826,7 @@ int write_files (lang_t *this, char **files, size_t arrlen) {
   size_t files_len[arrlen];
   size_t max_size = 0;
   for (size_t i = 0; i < arrlen; i++) {
-    files_len[i] = strlen (files[i]);
+    files_len[i] = bytelen (files[i]);
     if (max_size < files_len[i])
       max_size = files_len[i];
   }
@@ -808,7 +850,7 @@ int write_files (lang_t *this, char **files, size_t arrlen) {
        return -1;
      }
 
-     fprintf (this->fp_out, "\n    /*%d: %s.%c */\n", ++this->file_idx, files[i], this->ext[this->exttype]);
+     fprintf (this->fp_out, "\n    /* %d: %s.%c */\n", ++this->file_idx, files[i], this->ext[this->exttype]);
 
      char *line = NULL;
      this->line_len = 0;
@@ -964,7 +1006,7 @@ int copy_files (lang_t *this) {
   if (-1 ==copy_file (makefile_file_src, makefile_file_dest, APPEND))
     return -1;
 
-  size_t opcodes_len = strlen ("opcodes.h");
+  size_t opcodes_len = bytelen ("opcodes.h");
   char opc_file_src[this->lang_c_dir_len + opcodes_len + 2];
   snprintf (opc_file_src, this->lang_c_dir_len + opcodes_len + 2, "%s/opcodes.h", this->lang_c_dir);
   char opc_file_dest[this->build_dir_len + opcodes_len + 2];
@@ -973,7 +1015,7 @@ int copy_files (lang_t *this) {
   if (-1 == copy_file (opc_file_src, opc_file_dest, NO_APPEND))
     return -1;
 
-  size_t lineno_len = strlen ("linenoise.h");
+  size_t lineno_len = bytelen ("linenoise.h");
   char lineno_file_src[this->lang_c_dir_len + lineno_len + 2];
   snprintf (lineno_file_src, this->lang_c_dir_len + lineno_len + 2, "%s/linenoise.h", this->lang_c_dir);
   char lineno_file_dest[this->build_dir_len + lineno_len + 2];
@@ -1015,7 +1057,16 @@ int copy_files (lang_t *this) {
   snprintf (api_file_dest, this->build_dir_len + this->api_len + 2, "%s/%s",
       this->build_dir, this->enable_lai ? LAI_API : DICTU_API);
 
-  return copy_file (api_file_src, api_file_dest, NO_APPEND);
+  if (-1 == copy_file (api_file_src, api_file_dest, NO_APPEND))
+    return -1;
+
+  size_t license_len = bytelen ("LICENSE");
+  char license_file_src[this->lang_c_dir_len + license_len + 5];
+  snprintf (license_file_src, this->lang_c_dir_len + license_len + 5, "%s/../LICENSE", this->lang_c_dir);
+  char license_file_dest[this->build_dir_len + license_len + 2];
+  snprintf (license_file_dest, this->build_dir_len + license_len + 2, "%s/LICENSE", this->build_dir);
+
+  return copy_file (license_file_src, license_file_dest, NO_APPEND);
 }
 
 int enable_functionality (lang_t *this) {
@@ -1160,12 +1211,12 @@ int parse_lai (char *laiscript, size_t scr_len) {
   char *bname = path_basename (fname);
   char *extname = path_extname (fname);
 
-  size_t dname_len = strlen (dname);
-  size_t bname_len = strlen (bname);
-  size_t extnm_len = strlen (extname);
+  size_t dname_len = bytelen (dname);
+  size_t bname_len = bytelen (bname);
+  size_t extnm_len = bytelen (extname);
 
   bname[bname_len - extnm_len] = '\0';
-  size_t len = ((dname_len + bname_len + strlen (DICTU_EXT)) - extnm_len) + 1;
+  size_t len = ((dname_len + bname_len + bytelen (DICTU_EXT)) - extnm_len) + 1;
   char dict_file[len + 1];
   snprintf (dict_file, len + 1, "%s/%s%s", dname, bname, DICTU_EXT);
   free (dname);
@@ -1355,8 +1406,8 @@ int parse_lai (char *laiscript, size_t scr_len) {
         goto print;
       }
 
-      str_cp (lline + ldiff, lline_len, tmp + diff, strlen (tmp) - diff);
-      str_cp (tmp, lline_len, lline, strlen (lline));
+      str_cp (lline + ldiff, lline_len, tmp + diff, bytelen (tmp) - diff);
+      str_cp (tmp, lline_len, lline, bytelen (lline));
 
 print:
       fprintf (dest_fp, "%s", lline);
@@ -1380,7 +1431,7 @@ theend:
 
 int parse_lai_to_dictu (lang_t *this, int argc, char **argv) {
   for (int i = this->arg_idx; i < argc; i++) {
-    if (-1 == parse_lai (argv[i], strlen (argv[i])))
+    if (-1 == parse_lai (argv[i], bytelen (argv[i])))
       return -1;
   }
 
@@ -1401,6 +1452,8 @@ int show_help (char *prog) {
      "                    # humanized form and mimics a bit of Lua\n"
      "                    # Note: this is Dictu compatible, so Dictu scripts should\n"
      "                    # run without any modification, otherwise is a bug\n"
+     "  --disable-exit    # disables exit() method from System Class\n"
+     "                    # off by default, enabled with lai implicitly\n"
      "  --parse-lai       # parse lai script and output a Dictu script with a .du extension\n"
      "                    # Note: When this option is encountered, parsing argv stops\n"
      "                    # and any subsequent argunent is treated as argument to this\n"
@@ -1429,10 +1482,19 @@ int parse_args (lang_t *this, int argc, char **argv) {
       continue;
     }
 
+    if (str_eq (argv[i], "--disable-exit")) {
+      this->disable_exit = 1;
+      continue;
+    }
+
     if (str_eq (argv[i], "--enable-lai")) {
       this->api_len = this->lai_api_len;
       this->enable_lai = 1;
-      this->lang_name_len = strlen (LAI_NAME);
+
+      /* disable exit by default */
+      this->disable_exit = 1;
+
+      this->lang_name_len = bytelen (LAI_NAME);
       this->lang_name = Alloc (this->lang_name_len + 1);
       snprintf (this->lang_name, this->lang_name_len + 1, "%s", LAI_NAME);
       continue;
@@ -1469,7 +1531,7 @@ int parse_args (lang_t *this, int argc, char **argv) {
     }
 
     if (str_eq_n (argv[i], "--sysdir=", 9)) {
-      size_t len = strlen (argv[i]) - 9;
+      size_t len = bytelen (argv[i]) - 9;
       if (0 == len) {
         fprintf (stderr, "--sysdir= is an empty string\n");
         return -1;
@@ -1482,7 +1544,7 @@ int parse_args (lang_t *this, int argc, char **argv) {
     }
 
     if (str_eq_n (argv[i], "--langcdir=", 11)) {
-      size_t len = strlen (argv[i]) - 11;
+      size_t len = bytelen (argv[i]) - 11;
       if (0 == len) {
         fprintf (stderr, "--langcdir= is an empty string\n");
         return -1;
@@ -1495,7 +1557,7 @@ int parse_args (lang_t *this, int argc, char **argv) {
     }
 
     if (str_eq_n (argv[i], "--builddir=", 11)) {
-      size_t len = strlen (argv[i]) - 11;
+      size_t len = bytelen (argv[i]) - 11;
       if (0 == len) {
         fprintf (stderr, "--builddir= is an empty string\n");
         return -1;
@@ -1508,7 +1570,7 @@ int parse_args (lang_t *this, int argc, char **argv) {
     }
 
     if (str_eq_n (argv[i], "--srcdir=", 9)) {
-      size_t len = strlen (argv[i]) - 9;
+      size_t len = bytelen (argv[i]) - 9;
       if (0 == len) {
         fprintf (stderr, "--srcdir= is an empty string\n");
         return -1;
@@ -1549,7 +1611,7 @@ int check_dirs (lang_t *this) {
     fprintf (stderr, "SYSDIR is not defined, nor --sysdir= option specified\n");
     return -1;
 #else
-    this->sys_dir_len = strlen (SYSDIR);
+    this->sys_dir_len = bytelen (SYSDIR);
     this->sys_dir = Alloc (this->sys_dir_len + 1);
     snprintf (this->sys_dir, this->sys_dir_len + 1, "%s", SYSDIR);
 #endif
@@ -1560,7 +1622,7 @@ int check_dirs (lang_t *this) {
     fprintf (stderr, "LANGCDIR is not defined, nor --langcdir= option specified\n");
     return -1;
 #else
-    this->lang_c_dir_len = strlen (LANGCDIR);
+    this->lang_c_dir_len = bytelen (LANGCDIR);
     this->lang_c_dir = Alloc (this->lang_c_dir_len + 1);
     snprintf (this->lang_c_dir, this->lang_c_dir_len + 1, "%s", LANGCDIR);
 #endif
@@ -1571,7 +1633,7 @@ int check_dirs (lang_t *this) {
     fprintf (stderr, "BUILDDIR is not defined, nor --builddir= option specified\n");
     return -1;
 #else
-    this->build_dir_len = strlen (BUILDDIR) + this->lang_name_len + 1;
+    this->build_dir_len = bytelen (BUILDDIR) + this->lang_name_len + 1;
     this->build_dir = Alloc (this->build_dir_len + 1);
     snprintf (this->build_dir, this->build_dir_len + 1, "%s/%s", BUILDDIR, this->lang_name);
 #endif
@@ -1582,7 +1644,7 @@ int check_dirs (lang_t *this) {
     fprintf (stderr, "SRCDIR is not defined, nor --srcdir= option specified\n");
     return -1;
 #else
-    this->src_dir_len = strlen (SRCDIR);
+    this->src_dir_len = bytelen (SRCDIR);
     this->src_dir = Alloc (this->src_dir_len + 1);
     snprintf (this->src_dir, this->src_dir_len + 1, "%s", SRCDIR);
 #endif
@@ -1619,6 +1681,7 @@ lang_t init_this (int argc, char **argv) {
   this.enable_http = 0;
   this.enable_repl = 0;
   this.enable_lai  = 0;
+  this.disable_exit = 0;
   this.help = 0;
   this.skip_function = 0;
   this.build_library = 0;
@@ -1648,7 +1711,7 @@ lang_t init_this (int argc, char **argv) {
   }
 
   if (NULL == this.lang_name) {
-    this.lang_name_len = strlen (DICTU_NAME);
+    this.lang_name_len = bytelen (DICTU_NAME);
     this.lang_name = Alloc (this.lang_name_len + 1);
     snprintf (this.lang_name, this.lang_name_len + 1, "%s", DICTU_NAME);
   }
@@ -1684,11 +1747,11 @@ lang_t init_this (int argc, char **argv) {
   snprintf (this.optional_dir, this.optional_dir_len + 1, "%s/optionals",
      this.lang_c_dir);
 
-  this.makefile_len = strlen (MAKEFILE);
-  this.main_len = strlen (MAIN);
-  this.dictu_api_len = this.api_len = strlen (DICTU_API);
-  this.lai_api_len = strlen (LAI_API);
-  this.lai_ext_len = strlen (LAI_EXTRA);
+  this.makefile_len = bytelen (MAKEFILE);
+  this.main_len = bytelen (MAIN);
+  this.dictu_api_len = this.api_len = bytelen (DICTU_API);
+  this.lai_api_len = bytelen (LAI_API);
+  this.lai_ext_len = bytelen (LAI_EXTRA);
   this.ext[H_TYPE] = 'h'; this.ext[C_TYPE] = 'c'; this.ext[2] = '\0';
   this.file_idx = 0;
   this.line_cb = line_cb;

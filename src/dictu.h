@@ -165,24 +165,25 @@ bool isFalsey(Value value);
 
 typedef VM Lstate;
 
-struct la_table_t {
+typedef struct l_table_t {
   bool (*get) (Table *, ObjString *, Value *);
-};
+} l_table_t;
 
-struct la_t {
-  struct la_table_t table;
+typedef struct l_t {
+  l_table_t table;
 
   Lstate *(*init) (const char *, int, const char **);
-  void (*deinit) (Lstate *);
+  void (*deinit) (Lstate **);
   InterpretResult (*compile) (Lstate *, const char *);
   ObjString *(*new_string) (Lstate *, const char *, int);
-};
+} l_t;
 
-typedef struct lai_t {
+typedef struct lang_t {
+  l_t self;
   Lstate **states;
   int num_states;
   int cur_state;
-} lai_t;
+} lang_t;
 
 #define GET_SELF_CLASS \
   AS_CLASS_NATIVE(args[-1])
@@ -209,5 +210,8 @@ void defineNative(VM *vm, Table *table, const char *name, NativeFn function);
 bool tableSet(VM *vm, Table *table, ObjString *key, Value value);
 void defineNativeProperty(VM *vm, Table *table, const char *name, Value value);
 void defineNative(VM *vm, Table *table, const char *name, NativeFn function);
+
+/* extensions */
 Table vm_get_globals(VM *vm);
+size_t vm_sizeof (void);
 #endif /* LAPI */
