@@ -18,32 +18,33 @@
  *                        # above files from the cloned dictu sources
  *                        # Note that the first two steps are optional if you already
  *                        # have Dictu sources in your filesystem
- *                        # 
- *  ./lmake               #
- *    options:            #
- *      --enable-http     # enable the http module (requires libcurl)
- *      --enable-repl     # enable an interactive session when building the interpreter
- *      --build-library   # invokes make to build the library
- *      --build-interp    # invokes make to build the sample interpreter
- *      --clean-installed # invokes make clean to clean installed generated objects
- *      --clean-build     # removes generated files from the build directory
- *      --enable-lai      # enable one language dialect, that it's syntax is in a more
- *                        # humanized form and mimics a bit of Lua
- *                        # Note: this is Dictu compatible, so Dictu scripts should
- *                        # run without any modification, otherwise is a bug
- *      --disable-exit    # disables exit() method from System Class
- *                        # off by default, enabled with lai implicitly
- *      --parse-lai       # parse lai script and output a Dictu script with a .du extension
- *                        # Note: When this option is encountered, parsing argv stops
- *                        # and any subsequent argunent is treated as argument to this
- *                        # function, which after its execution the program exits
- *                        # Also note that this is a crude algorithm
- *      --sysdir=`dir'    # system directory with write access, default [../sys]
- *      --builddir=`dir'  # build directory, default [build/dictu] or [build/lai]
- *      --langcdir=`dir'  # Dictu c sources directory, default [src/Dictu]
- *      --srcdir=`dir'    # source directory for this program, default [src]
- *      --donot-generate  # do not generate any files
- *      --help, -h        # show this message
+ *
+ *  ./lmake
+ *    options:
+ *      --enable-http       # enable the http module (requires libcurl)
+ *      --enable-repl       # enable an interactive session when building the interpreter
+ *      --build-library     # invokes make to build the library
+ *      --build-interp      # invokes make to build the sample interpreter
+ *      --clean-installed   # invokes make clean to clean installed generated objects
+ *      --clean-build       # removes generated files from the build directory
+ *      --enable-lai        # enable one language dialect, that it's syntax is in a more
+ *                          # humanized form and mimics a bit of Lua
+ *                          # Note: this is Dictu compatible, so Dictu scripts should
+ *                          # run without any modification, otherwise is a bug
+ *      --disable-exit      # disables exit() method from System Class
+ *                          # off by default, enabled with lai implicitly
+ *      --parse-lai         # parse lai script and output a Dictu script with a .du extension
+ *                          # Note: When this option is encountered, parsing argv stops
+ *                          # and any subsequent argunent is treated as argument to this
+ *                          # function, which after its execution the program exits
+ *                          # Also note that this is a crude algorithm
+ *      --sysdir=`dir'      # system directory with write access, default [../sys]
+ *      --builddir=`dir'    # build directory, default [build/dictu] or [build/lai]
+ *      --langcdir=`dir'    # Dictu c sources directory, default [src/Dictu]
+ *      --srcdir=`dir'      # source directory for this program, default [src]
+ *      --donot-generate    # do not generate any files
+ *      --donot-make-sysdir #do not make sys directory
+ *      --help, -h          # show this message
  */
 
 #define _POSIX_C_SOURCE 200809L
@@ -203,7 +204,8 @@ typedef struct lang_t {
     clean_build,
     help,
     skip_function,
-    lai_to_dictu;
+    lai_to_dictu,
+    make_sys_dir;
 
   FILE
     *fp_out,
@@ -1442,29 +1444,30 @@ int show_help (char *prog) {
   fprintf (stdout,
      "Usage: %s [options]\n\n"
      "Options:\n"
-     "  --enable-http     # enable the http module (requires libcurl)\n"
-     "  --enable-repl     # enable an interactive session when building the interpreter\n"
-     "  --build-library   # invokes make to build the library\n"
-     "  --build-interp    # invokes make to build the sample interpreter\n"
-     "  --clean-installed # invokes make clean to clean installed generated objects\n"
-     "  --clean-build     # removes generated files from the build directory\n"
-     "  --enable-lai      # enable one language dialect, that it's syntax is in a more\n"
-     "                    # humanized form and mimics a bit of Lua\n"
-     "                    # Note: this is Dictu compatible, so Dictu scripts should\n"
-     "                    # run without any modification, otherwise is a bug\n"
-     "  --disable-exit    # disables exit() method from System Class\n"
-     "                    # off by default, enabled with lai implicitly\n"
-     "  --parse-lai       # parse lai script and output a Dictu script with a .du extension\n"
-     "                    # Note: When this option is encountered, parsing argv stops\n"
-     "                    # and any subsequent argunent is treated as argument to this\n"
-     "                    # function, which after its execution the program exits\n"
-     "                    # Also note that this is a crude algorithm\n"
-     "  --sysdir=`dir'    # system directory with write access, default [../sys]\n"
-     "  --builddir=`dir'  # build directory, default [build/dictu] or [build/lai]\n"
-     "  --langcdir=`dir'  # Dictu c sources directory, defualt [src/Dictu]\n"
-     "  --srcdir=`dir'    # source directory for this program, default [src]\n"
-     "  --donot-generate  # do not generate any files\n"
-     "  --help, -h        # show this message\n",
+     "  --enable-http       # enable the http module (requires libcurl)\n"
+     "  --enable-repl       # enable an interactive session when building the interpreter\n"
+     "  --build-library     # invokes make to build the library\n"
+     "  --build-interp      # invokes make to build the sample interpreter\n"
+     "  --clean-installed   # invokes make clean to clean installed generated objects\n"
+     "  --clean-build       # removes generated files from the build directory\n"
+     "  --enable-lai        # enable one language dialect, that it's syntax is in a more\n"
+     "                      # humanized form and mimics a bit of Lua\n"
+     "                      # Note: this is Dictu compatible, so Dictu scripts should\n"
+     "                      # run without any modification, otherwise is a bug\n"
+     "  --disable-exit      # disables exit() method from System Class\n"
+     "                      # off by default, enabled with lai implicitly\n"
+     "  --parse-lai         # parse lai script and output a Dictu script with a .du extension\n"
+     "                      # Note: When this option is encountered, parsing argv stops\n"
+     "                      # and any subsequent argunent is treated as argument to this\n"
+     "                      # function, which after its execution the program exits\n"
+     "                      # Also note that this is a crude algorithm\n"
+     "  --sysdir=`dir'      # system directory with write access, default [../sys]\n"
+     "  --builddir=`dir'    # build directory, default [build/dictu] or [build/lai]\n"
+     "  --langcdir=`dir'    # Dictu c sources directory, defualt [src/Dictu]\n"
+     "  --srcdir=`dir'      # source directory for this program, default [src]\n"
+     "  --donot-generate    # do not generate any files\n"
+     "  --donot-make-sysdir # do not make sys directory\n"
+     "  --help, -h          # show this message\n",
      prog);
   return 0;
 }
@@ -1527,6 +1530,11 @@ int parse_args (lang_t *this, int argc, char **argv) {
 
     if (str_eq (argv[i], "--donot-generate")) {
       this->donot_generate = 1;
+      continue;
+    }
+
+    if (str_eq (argv[i], "--donot-make-sysdir")) {
+      this->make_sys_dir = 0;
       continue;
     }
 
@@ -1599,8 +1607,9 @@ int make_dirs (lang_t *this) {
   if (-1 == make_dir (this->build_dir))
     return -1;
 
-  if (-1 == make_dir (this->sys_dir))
-    return -1;
+  if (this->make_sys_dir)
+    if (-1 == make_dir (this->sys_dir))
+      return -1;
 
   return 0;
 }
@@ -1754,6 +1763,7 @@ lang_t init_this (int argc, char **argv) {
   this.lai_ext_len = bytelen (LAI_EXTRA);
   this.ext[H_TYPE] = 'h'; this.ext[C_TYPE] = 'c'; this.ext[2] = '\0';
   this.file_idx = 0;
+  this.make_sys_dir = 1;
   this.line_cb = line_cb;
   this.file_cb = file_cb;
   this.on_close_cb = file_on_close_cb;
