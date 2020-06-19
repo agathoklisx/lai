@@ -2,4 +2,7 @@
 /lai
 build/
 priv/
+lmake
+src/tests/tests.du
+src/Dictu/
 self.sh

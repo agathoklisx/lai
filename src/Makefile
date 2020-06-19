@@ -7,7 +7,7 @@ CC_STD      := -std=c11
 BASE_FLAGS  := -g -O2 -march=native
 # -fvisibility=hidden
 
-DEBUG_FLAGS := -Wextra -Wno-shadow -Wall -Wunused-function -Wunused-macros -Wno-unused-parameter -Wno-strict-aliasing
+DEBUG_FLAGS := -Wextra -Wno-shadow -Wall -Wunused-function -Wunused-macros
 
 FLAGS       := $(BASE_FLAGS) $(DEBUG_FLAGS) -lm
 

@@ -103,8 +103,11 @@ char *opt_files[] = {
   "json",
   "math",
   "path",
-  "system"
+  "system",
+  "datetime"
 };
+
+char *feature_macros = "#define _XOPEN_SOURCE 700\n\n";
 
 char *std_headers[] = {
   "stdint",
@@ -779,6 +782,16 @@ int parse_jsonParseLib (lang_t *this, char *line, size_t len) {
   return PARSELINE_OK;
 }
 
+int parse_datetime (lang_t *this, char *line, size_t len) {
+  (void) this; (void) len;
+
+  char *tmp = strstr (line, "XOPEN");
+  if (tmp)
+    return PARSELINE_NEXT_LINE;
+
+  return PARSELINE_OK;
+}
+
 int line_cb (lang_t *this, char *file, char *line, size_t len) {
   if (0 == strncmp ("#include", line, 8))
     return PARSELINE_NEXT_LINE;
@@ -803,6 +816,9 @@ int line_cb (lang_t *this, char *file, char *line, size_t len) {
 
   if (strstr (file, "jsonParseLib.c"))
     return parse_jsonParseLib (this, line, len);
+
+  if (strstr (file, "datetime.h"))
+    return parse_datetime (this, line, len);
 
   return PARSELINE_OK;
 }
@@ -890,6 +906,8 @@ next:
 }
 
 int write_include_std_headers (lang_t *this) {
+  fprintf (this->fp_out, "%s", feature_macros);
+
   for (size_t i = 0; i < ARRLEN(std_headers); i++) {
     if (str_eq (std_headers[i], "curl/curl")) {
       if (0 == this->enable_http)
