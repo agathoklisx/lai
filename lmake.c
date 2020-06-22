@@ -827,10 +827,26 @@ int file_on_close_cb (lang_t *this, char *file) {
   if (strstr (file, "vm.c")) {
     fprintf (this->fp_out,
         "\n/*** EXTENSIONS ***/\n\n"
-        "Table vm_get_globals(VM *vm) {\n"
-        "    return vm->globals;\n}\n\n"
+        "Table *vm_get_globals(VM *vm) {\n"
+        "    return &vm->globals;\n}\n\n"
         "size_t vm_sizeof(void) {\n"
-        "    return sizeof (VM);\n}\n\n"
+        "    return sizeof(VM);\n}\n\n"
+        "ObjModule *vm_module_get(VM *vm, char *name, int len) {\n"
+        "    Value moduleVal;\n"
+        "    ObjString *string = copyString (vm, name, len);\n"
+        "    if (!tableGet(&vm->modules, string, &moduleVal))\n"
+        "        return NULL;\n"
+        "    return AS_MODULE(moduleVal);\n}\n\n"
+        "Table *vm_get_module_table(VM *vm, char *name, int len) {\n"
+        "    ObjModule *module = vm_module_get(vm, name, len);\n"
+        "    if (NULL == module)\n"
+        "        return NULL;\n"
+        "    return &module->values;\n}\n\n"
+        "Value *vm_table_get_value(VM *vm, Table *table, ObjString *obj, Value *value){\n"
+        "    UNUSED(vm);\n"
+        "    if (false == tableGet(table, obj, value))\n"
+        "        return NULL;\n"
+        "    return value;\n}\n\n"
         "/*** EXTENSIONS END ***/\n");
   }
 

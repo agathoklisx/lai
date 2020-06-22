@@ -48,7 +48,7 @@ $(LIBDIR)/lib$(NAME)-$(VERSION).a:
 	@$(LN_S) -vf $(LIBDIR)/lib$(NAME)-$(VERSION).a $(LIBDIR)/lib$(NAME).a
 	@$(RM) lib$(NAME).o
 
-interp: shared-library
+interpr: shared-library
 	$(CC) -o $(BINDIR)/$(NAME) -lm -l$(NAME) $(INTERP_FLAGS) $(INTERP_FILES)
 
 clean: clean-header clean-shared clean-static
