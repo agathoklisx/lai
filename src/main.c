@@ -1,5 +1,5 @@
 #ifdef ENABLE_REPL
-#define VERSION "Dictu Version: 0.5.2\n"
+#define VERSION "Dictu Version: 0.8.0\n"
 
 #include "linenoise.h"
 

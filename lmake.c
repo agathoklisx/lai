@@ -562,9 +562,6 @@ int file_cb (lang_t *this, char * file) {
   if (NULL != strstr (file, "common.c"))
     return PARSEFILE_NEXT;
 
-  if (NULL != strstr (file, "optionals.c"))
-    return PARSEFILE_NEXT;
-
   if (NULL != strstr (file, "http")) {
     if (this->enable_http == 0)
       return PARSEFILE_NEXT;
@@ -1032,8 +1029,8 @@ int copy_files (lang_t *this) {
     return -1;
   }
 
-  fprintf (mfp, "NAME    := %s\nVERSION := %s\nSYSDIR  := %s\n",
-      this->lang_name, VERSION, this->sys_dir);
+  fprintf (mfp, "NAME    := %s\nVERSION := %s\nSYSDIR  :=\n",
+      this->lang_name, VERSION);
   fclose (mfp);
 
   if (this->donot_generate)
