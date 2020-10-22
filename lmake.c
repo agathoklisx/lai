@@ -43,7 +43,7 @@
  *      --langcdir=`dir'    # Dictu c sources directory, default [src/Dictu]
  *      --srcdir=`dir'      # source directory for this program, default [src]
  *      --donot-generate    # do not generate any files
- *      --donot-make-sysdir #do not make sys directory
+ *      --donot-make-sysdir # do not make sys directory
  *      --help, -h          # show this message
  */
 
@@ -58,7 +58,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
-
 
 #define ifnot(__expr__) if (0 == (__expr__))
 #define bytelen strlen
@@ -104,7 +103,9 @@ char *opt_files[] = {
   "math",
   "path",
   "system",
-  "datetime"
+  "datetime",
+  "socket",
+  "random"
 };
 
 char *feature_macros = "#define _XOPEN_SOURCE 700\n\n";
@@ -125,8 +126,10 @@ char *std_headers[] = {
   "sys/stat",
   "sys/types",
   "curl/curl",
+  "dirent",
+  "arpa/inet",
   "errno",
-  "assert"
+  "assert",
 };
 
 char main_headers[] =
