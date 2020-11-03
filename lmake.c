@@ -304,6 +304,7 @@ size_t str_cp (char *dest, size_t dest_len, const char *src, size_t nelem) {
   dest[len] = '\0';
   return len;
 }
+
 int is_directory (char *dname) {
   struct stat st;
   if (-1 == stat (dname, &st)) return 0;
@@ -783,7 +784,8 @@ int parse_jsonParseLib (lang_t *this, char *line, size_t len) {
 }
 
 int parse_datetime (lang_t *this, char *line, size_t len) {
-  (void) this; (void) len;
+  (void) this; (void) len; (void) len;
+  return PARSELINE_OK;
 
   char *tmp = strstr (line, "XOPEN");
   if (tmp)
@@ -1032,8 +1034,13 @@ int copy_files (lang_t *this) {
     return -1;
   }
 
-  fprintf (mfp, "NAME    := %s\nVERSION := %s\nSYSDIR  :=\n",
+  fprintf (mfp, "NAME    := %s\nVERSION := %s\n\n",
       this->lang_name, VERSION);
+
+  fprintf (mfp, "ENABLE_REPL := %d\n", this->enable_repl);
+  fprintf (mfp, "ENABLE_HTTP := %d\n", this->enable_http);
+  fprintf (mfp, "\nSYSDIR  := sys\n");
+
   fclose (mfp);
 
   if (this->donot_generate)
