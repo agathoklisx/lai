@@ -1,4 +1,6 @@
 /* Dictu as a single file source library language.
+ * Build against commit:
+ * 1c6caafb6f08f8846a2d7fb0c8655a0af5c46f1f (HEAD -> develop, origin/develop, origin/HEAD)
  *
  * This tool works by parsing Dictu sources and generates the following files:
  *   dictu.c  
@@ -22,7 +24,7 @@
  *  ./lmake
  *    options:
  *      --enable-http       # enable the http module (requires libcurl)
- *      --enable-repl       # enable an interactive session when building the interpreter
+ *      --enable-sqlite     # enable sqlite functionality (requires libsqlite3)
  *      --build-library     # invokes make to build the library
  *      --build-interp      # invokes make to build the sample interpreter
  *      --clean-installed   # invokes make clean to clean installed generated objects
@@ -65,17 +67,17 @@
 #define uchar unsigned char
 
 char *c_files[] = {
-  "common",
-  "value",
-  "chunk",
-  "table",
-  "object",
-  "scanner",
-  "compiler",
-  "vm",
-  "natives",
-  "memory",
-  "util"
+  "vm/common",
+  "vm/value",
+  "vm/chunk",
+  "vm/table",
+  "vm/object",
+  "vm/scanner",
+  "vm/compiler",
+  "vm/vm",
+  "vm/natives",
+  "vm/memory",
+  "vm/util"
 };
 
 char *dtype_files[] = {
@@ -85,7 +87,9 @@ char *dtype_files[] = {
   "dicts",
   "files",
   "instance",
-  "lists",
+  "result",
+  "lists/list-source",
+  "lists/lists",
   "nil",
   "number",
   "sets",
@@ -94,18 +98,32 @@ char *dtype_files[] = {
 
 char *opt_files[] = {
   "optionals",
+  "base64/base64Lib",
+  "base64",
   "c",
+  "datetime",
   "env",
+  "hashlib/constants",
+  "hashlib/utils",
+  "hashlib/sha256",
+  "hashlib/hmac",
+  "hashlib/bcrypt/bcrypt",
+  "hashlib/bcrypt/blf",
+  "hashlib/bcrypt/portable_endian",
+  "hashlib/bcrypt/timingsafe_bcmp",
+  "hashlib",
   "http",
-  "jsonParseLib",
-  "jsonBuilderLib",
+  "json/jsonParseLib",
+  "json/jsonBuilderLib",
   "json",
   "math",
   "path",
-  "system",
-  "datetime",
+  "process",
+  "random",
   "socket",
-  "random"
+  "sqlite",
+//  "sqlite/sqlite3",
+  "system"
 };
 
 char *feature_macros = "#define _XOPEN_SOURCE 700\n\n";
@@ -125,7 +143,9 @@ char *std_headers[] = {
   "sys/utsname",
   "sys/stat",
   "sys/types",
+  "sys/wait",
   "curl/curl",
+  "sqlite3",
   "dirent",
   "arpa/inet",
   "errno",
@@ -145,7 +165,7 @@ char main_headers[] =
 
 #define DICTU_NAME "dictu"
 #define LAI_NAME "lai"
-#define VERSION "0.1"
+#define VERSION "0.3"
 
 #define H_TYPE 0
 #define C_TYPE 1
@@ -201,6 +221,7 @@ typedef struct lang_t {
     exttype,
     enable_lai,
     enable_http,
+    enable_sqlite,
     enable_repl,
     disable_exit,
     build_library,
@@ -213,9 +234,7 @@ typedef struct lang_t {
     lai_to_dictu,
     make_sys_dir;
 
-  FILE
-    *fp_out,
-    *fp_in;
+  FILE *fp_out;
 
   size_t
     datatype_dir_len,
@@ -563,15 +582,36 @@ char *insert_str (lang_t *this, char *line, size_t len, char *ptr, char *buf, si
 }
 
 int file_cb (lang_t *this, char * file) {
+  if (NULL != strstr (file, "hashlib/constants.c"))
+    return PARSEFILE_NEXT;
+
+  if (NULL != strstr (file, "hashlib/bcrypt/portable_endian.c"))
+    return PARSEFILE_NEXT;
+
+  if (NULL != strstr (file, "hashlib/bcrypt/timingsafe_bcmp.h"))
+    return PARSEFILE_NEXT;
+
   if (NULL != strstr (file, "common.c"))
     return PARSEFILE_NEXT;
 
   if (NULL != strstr (file, "http")) {
-    if (this->enable_http == 0)
-      return PARSEFILE_NEXT;
-
-    fprintf (this->fp_out, "#ifndef DISABLE_HTTP\n\n");
+    fprintf (this->fp_out, "\n\n#ifndef DISABLE_HTTP\n");
+    return PARSEFILE_OK;
   }
+
+  if (NULL != strstr (file, "list-source.c"))
+    return PARSEFILE_NEXT;
+
+  if (NULL != strstr (file, "sqlite3.h")) {
+    char sqlite_dest[this->build_dir_len + 9 + 2];
+    snprintf (sqlite_dest, this->build_dir_len + 9 + 2, "%s/%s",
+        this->build_dir, "sqlite3.h");
+    copy_file (file, sqlite_dest, NO_APPEND);
+    return PARSEFILE_NEXT;
+  }
+
+  if (NULL != strstr (file, "sqlite"))
+    fprintf (this->fp_out, "\n#ifndef DISABLE_SQLITE\n");
 
   return PARSEFILE_OK;
 }
@@ -657,10 +697,11 @@ int parse_scanner (lang_t *this, char *line, size_t len) {
       return PARSELINE_NEXT_LINE;
     }
 
-    if (str_eq (line, "static TokenType identifierType() {\n")) {
+    if (str_eq_n (line, "static TokenType identifierType", 31)) {
       char ext[this->src_dir_len + this->lai_ext_len + 2];
       snprintf (ext, this->src_dir_len + this->lai_ext_len + 2, "%s/%s",
           this->src_dir, LAI_EXTRA);
+
       FILE *fp = fopen (ext, "r");
       if (fp == NULL) {
         fprintf (stderr, "fopen(): %s\n%s\n", ext, strerror (errno));
@@ -783,6 +824,33 @@ int parse_jsonParseLib (lang_t *this, char *line, size_t len) {
   return PARSELINE_OK;
 }
 
+int parse_sqlite (lang_t *this, char *line, size_t len) {
+  char prefix[] = "sqlite_";
+  size_t pr_len = 7;
+
+  char *tmp = strstr (line, "execute");
+  while (tmp) {
+    line = insert_str (this, line, len, tmp, prefix, pr_len);
+    len += pr_len;
+    tmp = strstr(tmp + 14, "execute");
+  }
+
+  return PARSELINE_OK;
+}
+
+int parse_optionals (lang_t *this, char *line, size_t len) {
+  if (strstr (line, "Sqlite")) {
+    line = insert_str (this, line, len, line,
+        "#ifndef DISABLE_SQLITE\n", 23);
+
+    char *ptr = line + len + 23;
+    line = insert_str (this, line, len + 23, ptr,
+     "#endif /* DISABLE_SQLITE */\n", 28);
+  }
+
+  return PARSELINE_OK;
+}
+
 int parse_datetime (lang_t *this, char *line, size_t len) {
   (void) this; (void) len; (void) len;
   return PARSELINE_OK;
@@ -797,6 +865,9 @@ int parse_datetime (lang_t *this, char *line, size_t len) {
 int line_cb (lang_t *this, char *file, char *line, size_t len) {
   if (0 == strncmp ("#include", line, 8))
     return PARSELINE_NEXT_LINE;
+
+  if (strstr (file, "sqlite"))
+    return parse_sqlite (this, line, len);
 
   if (strstr (file, "compiler.c"))
     return parse_compiler (this, line, len);
@@ -822,40 +893,51 @@ int line_cb (lang_t *this, char *file, char *line, size_t len) {
   if (strstr (file, "datetime.h"))
     return parse_datetime (this, line, len);
 
+  if (strstr (file, "optionals.c"))
+    return parse_optionals (this, line, len);
+
   return PARSELINE_OK;
 }
 
 int file_on_close_cb (lang_t *this, char *file) {
+  if (strstr (file, "sqlite")) {
+    fprintf (this->fp_out, "\n#endif /* DISABLE_SQLITE */\n");
+    return PARSEFILE_OK;
+  }
+
+  if (strstr (file, "http")) {
+    fprintf (this->fp_out, "\n#endif /* DISABLE_HTTP */\n");
+    return PARSEFILE_OK;
+  }
+
   if (strstr (file, "vm.c")) {
     fprintf (this->fp_out,
         "\n/*** EXTENSIONS ***/\n\n"
-        "Table *vm_get_globals(VM *vm) {\n"
+        "Table *vm_get_globals(DictuVM *vm) {\n"
         "    return &vm->globals;\n}\n\n"
         "size_t vm_sizeof(void) {\n"
-        "    return sizeof(VM);\n}\n\n"
-        "ObjModule *vm_module_get(VM *vm, char *name, int len) {\n"
+        "    return sizeof(DictuVM);\n}\n\n"
+        "ObjModule *vm_module_get(DictuVM *vm, char *name, int len) {\n"
         "    Value moduleVal;\n"
         "    ObjString *string = copyString (vm, name, len);\n"
         "    if (!tableGet(&vm->modules, string, &moduleVal))\n"
         "        return NULL;\n"
         "    return AS_MODULE(moduleVal);\n}\n\n"
-        "Table *vm_get_module_table(VM *vm, char *name, int len) {\n"
+        "Table *vm_get_module_table(DictuVM *vm, char *name, int len) {\n"
         "    ObjModule *module = vm_module_get(vm, name, len);\n"
         "    if (NULL == module)\n"
         "        return NULL;\n"
         "    return &module->values;\n}\n\n"
-        "Value *vm_table_get_value(VM *vm, Table *table, ObjString *obj, Value *value){\n"
+        "Value *vm_table_get_value(DictuVM *vm, Table *table, ObjString *obj, Value *value){\n"
         "    UNUSED(vm);\n"
         "    if (false == tableGet(table, obj, value))\n"
         "        return NULL;\n"
         "    return value;\n}\n\n"
         "/*** EXTENSIONS END ***/\n");
+    return PARSEFILE_OK;
   }
 
-  if (NULL != strstr (file, "http"))
-    fprintf (this->fp_out, "\n#endif /* DISABLE_HTTP */\n");
-
-  return 0;
+  return PARSEFILE_OK;
 }
 
 int write_files (lang_t *this, char **files, size_t arrlen) {
@@ -870,56 +952,60 @@ int write_files (lang_t *this, char **files, size_t arrlen) {
   size_t file_len = max_size + this->base_dir_len + 3;
   char file[file_len + 1];
 
+  char *line = Alloc (4096);
+  this->line_len = 4096;
+
+  FILE *fp = NULL;
+
   for (size_t i = 0; i < arrlen; i++) {
-     snprintf (file, this->base_dir_len + files_len[i] + 4, "%s/%s.%c",
-         this->base_dir, files[i], this->ext[this->exttype]);
+    snprintf (file, file_len + 1, "%s/%s.%c",
+        this->base_dir, files[i], this->ext[this->exttype]);
 
-     int cb_retval = this->file_cb (this, file);
-     if (PARSEFILE_BREAK == cb_retval) {
-       return 0;
-     } else if (PARSEFILE_NEXT == cb_retval) {
-       continue;
-     }
+    int cb_retval = this->file_cb (this, file);
+    if (PARSEFILE_BREAK == cb_retval) {
+      return 0;
+    } else if (PARSEFILE_NEXT == cb_retval) {
+      continue;
+    }
 
-     if ((this->fp_in = fopen (file, "r")) == NULL) {
-       fprintf (stderr, "fopen(): %s\n%s\n", file, strerror (errno));
-       return -1;
-     }
+    if ((fp = fopen (file, "r")) == NULL) {
+      fprintf (stderr, "fopen(): %s\n%s\n", file, strerror (errno));
+      return -1;
+    }
 
-     fprintf (this->fp_out, "\n    /* %d: %s.%c */\n", ++this->file_idx, files[i], this->ext[this->exttype]);
+    fprintf (this->fp_out, "\n    /* %d: %s.%c */\n", ++this->file_idx, files[i], this->ext[this->exttype]);
 
-     char *line = NULL;
-     this->line_len = 0;
+    line[0] = '\0';
 
-     ssize_t nread;
-     while (-1 != (nread = getline (&line, &this->line_len, this->fp_in))) {
-       if (nread) {
-         cb_retval = this->line_cb (this, file, line, nread);
-         if (PARSELINE_BREAK == cb_retval) {
-           fclose (this->fp_in);
-           free (line);
-           return 0;
-         }
+    ssize_t nread;
+    while (-1 != (nread = getline (&line, &this->line_len, fp))) {
+      if (nread) {
+        line[nread] = '\0';
+        cb_retval = this->line_cb (this, file, line, nread);
+        if (PARSELINE_BREAK == cb_retval) {
+          fclose (fp);
+          free (line);
+          return 0;
+        }
 
-         if (PARSELINE_NEXT_FILE == cb_retval)
-           goto next;
+        if (PARSELINE_NEXT_FILE == cb_retval)
+          goto next_file;
 
-         if (PARSELINE_NEXT_LINE == cb_retval)
-           continue;
+        if (PARSELINE_NEXT_LINE == cb_retval)
+          continue;
 
-         fprintf (this->fp_out, "%s", line);
-       }
-     }
+        fprintf (this->fp_out, "%s", line);
+        fflush (this->fp_out);
+      }
+    }
 
-next:
-     if (line != NULL)
-       free (line);
+next_file:
+    this->on_close_cb (this, file);
 
-     this->on_close_cb (this, file);
-
-     fclose (this->fp_in);
+    fclose (fp);
   }
 
+  free (line);
   return 0;
 }
 
@@ -928,10 +1014,22 @@ int write_include_std_headers (lang_t *this) {
 
   for (size_t i = 0; i < ARRLEN(std_headers); i++) {
     if (str_eq (std_headers[i], "curl/curl")) {
-      if (0 == this->enable_http)
+      fprintf (this->fp_out,
+          "#ifndef DISABLE_HTTP\n"
+          "#include <%s.h>\n"
+          "#endif /* DISABLE_HTTP */\n",
+          std_headers[i]);
         continue;
     }
 
+    if (str_eq (std_headers[i], "sqlite3")) {
+      fprintf (this->fp_out,
+          "#ifndef DISABLE_SQLITE\n"
+          "#include <%s.h>\n"
+          "#endif /* DISABLE_SQLITE */\n",
+          std_headers[i]);
+        continue;
+    }
     fprintf (this->fp_out, "#include <%s.h>\n", std_headers[i]);
   }
 
@@ -953,6 +1051,14 @@ int create_hfile (lang_t *this) {
     fprintf (stderr, "fopen(): %s\n%s\n", dest_file, strerror (errno));
     return -1;
   }
+
+  fprintf (this->fp_out, "typedef struct _vm DictuVM;\n");
+  fprintf (this->fp_out,
+      "typedef enum {\n"
+        "INTERPRET_OK,\n"
+        "INTERPRET_COMPILE_ERROR,\n"
+        "INTERPRET_RUNTIME_ERROR\n"
+      "} DictuInterpretResult;\n");
 
   this->exttype = H_TYPE;
   if (-1 == write_files (this, c_files, ARRLEN(c_files))) {
@@ -997,6 +1103,15 @@ int create_cfile (lang_t *this) {
   write_include_std_headers (this);
 
   fprintf (this->fp_out, "\n#include \"__%s.h\"\n", this->lang_name);
+
+/*
+  if (this->enable_sqlite != 0)
+    fprintf (this->fp_out,
+        "\n#ifndef DISABLE_SQLITE\n"
+        "#include \"sqlite3.h\"\n"
+        "#endif\n");
+*/
+
   if (-1 == write_files (this, c_files, ARRLEN(c_files))) {
     fclose (this->fp_out);
     return -1;
@@ -1039,6 +1154,7 @@ int copy_files (lang_t *this) {
 
   fprintf (mfp, "ENABLE_REPL := %d\n", this->enable_repl);
   fprintf (mfp, "ENABLE_HTTP := %d\n", this->enable_http);
+  fprintf (mfp, "ENABLE_SQLITE := %d\n", this->enable_sqlite);
   fprintf (mfp, "\nSYSDIR  := sys\n");
 
   fclose (mfp);
@@ -1049,18 +1165,18 @@ int copy_files (lang_t *this) {
   if (-1 ==copy_file (makefile_file_src, makefile_file_dest, APPEND))
     return -1;
 
-  size_t opcodes_len = bytelen ("opcodes.h");
+  size_t opcodes_len = bytelen ("vm/opcodes.h");
   char opc_file_src[this->lang_c_dir_len + opcodes_len + 2];
-  snprintf (opc_file_src, this->lang_c_dir_len + opcodes_len + 2, "%s/opcodes.h", this->lang_c_dir);
+  snprintf (opc_file_src, this->lang_c_dir_len + opcodes_len + 2, "%s/vm/opcodes.h", this->lang_c_dir);
   char opc_file_dest[this->build_dir_len + opcodes_len + 2];
   snprintf (opc_file_dest, this->build_dir_len + opcodes_len + 2, "%s/opcodes.h", this->build_dir);
 
   if (-1 == copy_file (opc_file_src, opc_file_dest, NO_APPEND))
     return -1;
 
-  size_t lineno_len = bytelen ("linenoise.h");
+  size_t lineno_len = bytelen ("cli/linenoise.h");
   char lineno_file_src[this->lang_c_dir_len + lineno_len + 2];
-  snprintf (lineno_file_src, this->lang_c_dir_len + lineno_len + 2, "%s/linenoise.h", this->lang_c_dir);
+  snprintf (lineno_file_src, this->lang_c_dir_len + lineno_len + 2, "%s/cli/linenoise.h", this->lang_c_dir);
   char lineno_file_dest[this->build_dir_len + lineno_len + 2];
   snprintf (lineno_file_dest, this->build_dir_len + lineno_len + 2, "%s/linenoise.h", this->build_dir);
 
@@ -1068,9 +1184,54 @@ int copy_files (lang_t *this) {
     return -1;
 
   lineno_file_src[this->lang_c_dir_len + lineno_len] = 'c';
-  lineno_file_dest[this->build_dir_len + lineno_len] = 'c';
+  lineno_file_dest[(this->build_dir_len + lineno_len) - 4] = 'c';
 
   if (-1 == copy_file (lineno_file_src, lineno_file_dest, NO_APPEND))
+    return -1;
+
+  size_t argparse_len = bytelen ("cli/argparse.h");
+  char argparse_file_src[this->lang_c_dir_len + argparse_len + 2];
+  snprintf (argparse_file_src, this->lang_c_dir_len + argparse_len + 2, "%s/cli/argparse.h", this->lang_c_dir);
+  char argparse_file_dest[this->build_dir_len + argparse_len + 2];
+  snprintf (argparse_file_dest, this->build_dir_len + argparse_len + 2, "%s/argparse.h", this->build_dir);
+
+  if (-1 == copy_file (argparse_file_src, argparse_file_dest, NO_APPEND))
+    return -1;
+
+  argparse_file_src[this->lang_c_dir_len + argparse_len] = 'c';
+  argparse_file_dest[(this->build_dir_len + argparse_len) - 4] = 'c';
+
+  if (-1 == copy_file (argparse_file_src, argparse_file_dest, NO_APPEND))
+    return -1;
+
+  char encodings[this->build_dir_len + 9 + 1 + 1];
+  snprintf (encodings, this->build_dir_len + 9 + 1 + 1, "%s/encodings", this->build_dir);
+
+  if (-1 == access (encodings, F_OK)) {
+    if (-1 == mkdir (encodings, 0755)) {
+      fprintf (stderr, "mkdir(): %s\n%s\n", encodings, strerror (errno));
+      return -1;
+    }
+  } else {
+    if (0 == is_directory (encodings)) {
+      fprintf (stderr, "%s: not a directory\n", encodings);
+      return -1;
+    }
+  }
+
+  size_t encodings_len = bytelen ("cli/encodings/utf8.h");
+  char encodings_file_src[this->lang_c_dir_len + encodings_len + 3];
+  snprintf (encodings_file_src, this->lang_c_dir_len + encodings_len + 3, "%s/cli/encodings/utf8.h", this->lang_c_dir);
+  char encodings_file_dest[this->build_dir_len + encodings_len + 3];
+  snprintf (encodings_file_dest, this->build_dir_len + encodings_len + 3, "%s/encodings/utf8.h", this->build_dir);
+
+  if (-1 == copy_file (encodings_file_src, encodings_file_dest, NO_APPEND))
+    return -1;
+
+  encodings_file_src[this->lang_c_dir_len + encodings_len] = 'c';
+  encodings_file_dest[(this->build_dir_len + encodings_len) - 4] = 'c';
+
+  if (-1 == copy_file (encodings_file_src, encodings_file_dest, NO_APPEND))
     return -1;
 
   char main_file_src[this->src_dir_len + this->main_len + 2];
@@ -1116,9 +1277,6 @@ int enable_functionality (lang_t *this) {
   if (this->donot_generate)
     return 0;
 
-  if (this->enable_http  == 0 && this->enable_repl == 0)
-    return 0;
-
   char makefile_file_dest[this->build_dir_len + this->makefile_len + 2];
   snprintf (makefile_file_dest, this->build_dir_len + this->makefile_len + 2, "%s/%s",
       this->build_dir, MAKEFILE);
@@ -1160,6 +1318,18 @@ int enable_functionality (lang_t *this) {
 
       if (this->enable_repl) {
         if (str_eq (line, "ENABLE_REPL := 0\n")) {
+          if (-1 == fseek (fp, -2, SEEK_CUR)) {
+            fprintf (stderr, "fseek(): %s\n", strerror (errno));
+            goto theend;
+          }
+
+          fprintf (fp, "%d", 1);
+          break;
+        }
+      }
+
+      if (this->enable_sqlite) {
+        if (str_eq (line, "ENABLE_SQLITE := 0\n")) {
           if (-1 == fseek (fp, -2, SEEK_CUR)) {
             fprintf (stderr, "fseek(): %s\n", strerror (errno));
             goto theend;
@@ -1486,22 +1656,21 @@ int show_help (char *prog) {
      "Usage: %s [options]\n\n"
      "Options:\n"
      "  --enable-http       # enable the http module (requires libcurl)\n"
-     "  --enable-repl       # enable an interactive session when building the interpreter\n"
+     "  --enable-sqlite     # enable sqlite3 module (requires libsqlite3)\n"
      "  --build-library     # invokes make to build the library\n"
      "  --build-interp      # invokes make to build the sample interpreter\n"
      "  --clean-installed   # invokes make clean to clean installed generated objects\n"
      "  --clean-build       # removes generated files from the build directory\n"
-     "  --enable-lai        # enable one language dialect, that it's syntax is in a more\n"
-     "                      # humanized form and mimics a bit of Lua\n"
-     "                      # Note: this is Dictu compatible, so Dictu scripts should\n"
-     "                      # run without any modification, otherwise is a bug\n"
-     "  --disable-exit      # disables exit() method from System Class\n"
-     "                      # off by default, enabled with lai implicitly\n"
-     "  --parse-lai         # parse lai script and output a Dictu script with a .du extension\n"
-     "                      # Note: When this option is encountered, parsing argv stops\n"
-     "                      # and any subsequent argunent is treated as argument to this\n"
-     "                      # function, which after its execution the program exits\n"
-     "                      # Also note that this is a crude algorithm\n"
+     "  --enable-lai        # enable lai dialect, that mimics Lua syntax."
+     "                        Note that this is Dictu compatible, so Dictu scripts should"
+     "                        run without any modification, otherwise is a bug\n"
+     "  --disable-exit      # disables exit() method from System Class.\n"
+     "                        This is off by default, enabled with --enable-lai implicitly\n"
+     "  --parse-lai         # parse lai script and output a Dictu script with a .du extension.\n"
+     "                        Note: When this option is encountered, it stops to parsing thargv list\n"
+     "                        and any subsequent argunent is treated as argument to this\n"
+     "                        function, which after its execution the program exits.\n"
+     "                        This is a crude algorithm\n"
      "  --sysdir=`dir'      # system directory with write access, default [../sys]\n"
      "  --builddir=`dir'    # build directory, default [build/dictu] or [build/lai]\n"
      "  --langcdir=`dir'    # Dictu c sources directory, defualt [src/Dictu]\n"
@@ -1521,10 +1690,17 @@ int parse_args (lang_t *this, int argc, char **argv) {
       continue;
     }
 
+    if (str_eq (argv[i], "--enable-sqlite")) {
+      this->enable_sqlite = 1;
+      continue;
+    }
+
+/*
     if (str_eq (argv[i], "--enable-repl")) {
       this->enable_repl = 1;
       continue;
     }
+*/
 
     if (str_eq (argv[i], "--disable-exit")) {
       this->disable_exit = 1;
@@ -1729,7 +1905,8 @@ void deinit_this (lang_t *this) {
 lang_t init_this (int argc, char **argv) {
   lang_t this;
   this.enable_http = 0;
-  this.enable_repl = 0;
+  this.enable_repl = 1;
+  this.enable_sqlite = 0;
   this.enable_lai  = 0;
   this.disable_exit = 0;
   this.help = 0;
@@ -1787,9 +1964,9 @@ lang_t init_this (int argc, char **argv) {
     free (files);
   }
 
-  this.datatype_dir_len = this.lang_c_dir_len + 10;
+  this.datatype_dir_len = this.lang_c_dir_len + 13;
   this.datatype_dir = Alloc (this.datatype_dir_len + 1);
-  snprintf (this.datatype_dir, this.datatype_dir_len + 1, "%s/datatypes",
+  snprintf (this.datatype_dir, this.datatype_dir_len + 1, "%s/vm/datatypes",
      this.lang_c_dir);
 
   this.optional_dir_len = this.lang_c_dir_len + 10;

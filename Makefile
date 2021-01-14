@@ -9,11 +9,12 @@ INCDIR       = $(SYSDIR)/include
 LIBDIR       = $(SYSDIR)/lib
 
 DICTU        = Dictu
-DICTU_REPO   = https://github.com/Jason2605/Dictu.git
+DICTU_REPO   = https://github.com/dictu-lang/Dictu.git
 DICTU_DIR    = $(SRCDIR)/$(DICTU)
-DICTU_CDIR   = $(DICTU_DIR)/c
+DICTU_SRC_DIR= $(DICTU_DIR)/src
+DICTU_CDIR   = $(DICTU_SRC_DIR)/src
 DATATYPE_DIR = $(DICTU_CDIR)/datatypes
-OPTIONAL_DIR = $(DICTU_CDIR)/optionals
+OPTIONAL_DIR = $(DICTU_SRC_DIR)/optionals
 DICTU_BIN    = $(DICTU_DIR)/dictu
 
 CC          := gcc
