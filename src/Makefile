@@ -28,8 +28,8 @@ ifneq ($(ENABLE_REPL), 0)
   INTERP_FLAGS += -DENABLE_REPL
 endif
 
-ifneq ($(ENABLE_SQLITE), 0)
-  FLAGS += -lsqlite3
+ifeq ($(DISABLE_SQLITE), 0)
+  SHARED_FLAGS += -lsqlite3
 else
   SHARED_FLAGS += -DDISABLE_SQLITE
 endif

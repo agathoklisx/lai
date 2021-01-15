@@ -1154,7 +1154,11 @@ int copy_files (lang_t *this) {
 
   fprintf (mfp, "ENABLE_REPL := %d\n", this->enable_repl);
   fprintf (mfp, "ENABLE_HTTP := %d\n", this->enable_http);
-  fprintf (mfp, "ENABLE_SQLITE := %d\n", this->enable_sqlite);
+  if (this->enable_sqlite == 0)
+    fprintf (mfp, "DISABLE_SQLITE := $(shell ldconfig -v 2>/dev/null | grep sqlite3 >/dev/null; echo $$?)\n");
+  else
+    fprintf (mfp, "DISABLE_SQLITE := 0\n");
+
   fprintf (mfp, "\nSYSDIR  := sys\n");
 
   fclose (mfp);
